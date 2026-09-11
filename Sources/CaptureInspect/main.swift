@@ -6,6 +6,22 @@ func run() throws {
     let args = Array(CommandLine.arguments.dropFirst())
     guard let command = args.first else { throw CaptureError.invalid("Usage: capture-inspect fixture OUTPUT_DIR [front|rear] | inspect BUNDLE | ply BUNDLE FRAME_INDEX OUTPUT.ply | register INPUT.json OUTPUT.json | register-captures SOURCE_BUNDLE TARGET_BUNDLE SELECTION.json REPORT.json | surface CAPTURE_ROOT REQUEST.json OUTPUT.json OUTPUT.ply | face-landmarks BUNDLE FRAME_INDEX ROTATION REPORT.json | surface-hash SURFACE.json | canonical-surface SURFACE.json SELECTION.json OUTPUT.json | hair-fixture OUTPUT_DIR | hair-clearance INPUT.json HAIRCUT.json ANATOMY.json REPORT.json | hair-validate INPUT.json HAIRCUT.json REPORT.json | hair-edit INPUT.json BASE.json EDIT.json RESULT.json REPOSITORY_DIR [ANATOMY.json]") }
     switch command {
+    case "conditioning-fit-verify":
+        guard args.count == 9 else { throw CaptureError.invalid("conditioning-fit-verify requires INPUT BASE CANDIDATE MAPPING ANATOMY FIT EXPECTED_SAMPLE_SHA256 OUTPUT.") }
+        let decoder = ManifestCoding.decoder()
+        func data(_ index: Int) throws -> Data {
+            let url = URL(fileURLWithPath: args[index])
+            guard (try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? Int.max) <= 100_000_000 else { throw CaptureError.invalid("Fit input exceeds its byte budget.") }
+            return try Data(contentsOf:url)
+        }
+        let result = try decoder.decode(ConditioningDirectionFit.self,from:data(6)).verify(
+            input:decoder.decode(HairDesignInput.self,from:data(1)),
+            base:decoder.decode(HaircutRevision.self,from:data(2)),
+            candidate:decoder.decode(HaircutRevision.self,from:data(3)),
+            mapping:decoder.decode(ModelGuideImportRequest.self,from:data(4)),
+            anatomy:decoder.decode(GuideClearanceInput.self,from:data(5)),expectedSampleSHA256:args[7])
+        try ManifestCoding.encoder().encode(result).write(to:URL(fileURLWithPath:args[8]),options:.atomic)
+        print("Replayed bounded direction fit and complete supplied-anatomy clearance; physical acceptance remains false.")
     case "image-detail":
         guard args.count == 4, let index = Int(args[2]), index >= 0 else {
             throw CaptureError.invalid("image-detail requires BUNDLE FRAME_INDEX OUTPUT.json.")

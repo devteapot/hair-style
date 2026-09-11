@@ -57,6 +57,7 @@ public struct ProcessingConditioningResult: Codable, Sendable {
     public var acceptedForPersonalHaircut: Bool
     public var personalStyleVerified: Bool
     public var limitations: [String]
+    public var directionFit: ConditioningDirectionFit? = nil
 
     /// Create a self-contained editing-studio handoff after result verification.
     /// The retained scalp review must reproduce this candidate's geometry.
@@ -72,10 +73,19 @@ public struct ProcessingConditioningResult: Codable, Sendable {
               source.conditioning?.baseSourceSHA256 == request.modelSampleSHA256 else {
             throw CaptureError.invalid("Review handoff lost the conditioning sample reference.")
         }
-        let package=ModelReviewPackage(input:input,sourceArtifactData:sourceArtifactData,mapping:mapping,scalpReview:scalpReview)
+        var package=ModelReviewPackage(input:input,sourceArtifactData:sourceArtifactData,mapping:mapping,scalpReview:scalpReview)
+        if let fit = directionFit {
+            let imported = try ModelGuideImport.apply(sourceData:sourceArtifactData,input:input,request:mapping)
+            guard fit.sourceHaircutSHA256 == imported.validation.haircutSHA256 else {
+                throw CaptureError.invalid("Fitted review lost its original conditioned import.")
+            }
+            package.researchRevision = ResearchReviewRevision(sourceImportSHA256:fit.sourceHaircutSHA256,
+                haircutSHA256:try HairArtifactHash.digest(haircut),
+                method:"Declared bounded root-fixed direction fitting after conditioning. Root offsets remain inferred; physical fit and style are unverified.",haircut:haircut)
+        }
         let prepared=try package.prepare()
         guard try HairArtifactHash.digest(prepared.haircut) == HairArtifactHash.digest(haircut),
-              prepared.imported.validation.haircutSHA256 == validation.haircutSHA256 else {
+              prepared.mesh.haircutSHA256 == validation.haircutSHA256 else {
             throw CaptureError.invalid("Review handoff does not reproduce the conditioning revision.")
         }
         return package
@@ -109,11 +119,19 @@ public struct ProcessingConditioningResult: Codable, Sendable {
             throw CaptureError.invalid("Conditioned source is not bound to the selected model sample.")
         }
         let imported = try ModelGuideImport.apply(sourceData:result.sourceArtifactData,input:prepared,request:result.mapping)
-        let mesh = try HairMeshCompiler.compile(input:prepared,haircut:imported.haircut,radialSides:3,radiusScale:1)
         let anatomy = try decoder.decode(GuideClearanceInput.self,from:inputs.preparationInputs.anatomy)
-        let clearance = try GuideClearance.check(input:prepared,haircut:imported.haircut,anatomy:anatomy)
-        guard try HairArtifactHash.digest(imported.haircut) == HairArtifactHash.digest(result.haircut),
-              try HairArtifactHash.digest(imported.validation) == HairArtifactHash.digest(result.validation),
+        let selected: HaircutRevision, validation: HairValidationReport, clearance: GuideClearanceReport
+        if let fit = result.directionFit {
+            let verified = try fit.verify(input:prepared,base:imported.haircut,candidate:result.haircut,
+                mapping:originalMapping,anatomy:anatomy,expectedSampleSHA256:inputs.modelSampleSHA256)
+            selected = result.haircut; validation = verified.validation; clearance = verified.clearance
+        } else {
+            selected = imported.haircut; validation = imported.validation
+            clearance = try GuideClearance.check(input:prepared,haircut:selected,anatomy:anatomy)
+        }
+        let mesh = try HairMeshCompiler.compile(input:prepared,haircut:selected,radialSides:3,radiusScale:1)
+        guard try HairArtifactHash.digest(selected) == HairArtifactHash.digest(result.haircut),
+              try HairArtifactHash.digest(validation) == HairArtifactHash.digest(result.validation),
               try HairArtifactHash.digest(mesh) == HairArtifactHash.digest(result.mesh),
               try HairArtifactHash.digest(clearance) == HairArtifactHash.digest(result.clearance) else {
             throw CaptureError.invalid("Conditioning geometry or clearance does not replay locally.")

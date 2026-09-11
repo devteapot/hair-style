@@ -52,10 +52,25 @@ revision change, network model service or raw-capture upload was performed.
 
 ## Remaining integration
 
-Direction fitting is still a separate post-export experiment; the default
-conditioning pipeline truthfully retains its pre-fit clearance result. A durable
-post-fit handoff must bind the fitted revision, source import, constraints and
-clearance report before native regeneration can consume it automatically. The
-current successful handoff is a local research package. Both ears, inferred scalp
+The native result contract now accepts an optional `directionFit` record. It
+retains the original sample bytes and declared per-guide rotations, binds the
+conditioned import by canonical hash, and replays those edits exactly. Verification
+rejects changed attachments, undeclared edits, rotation of unaffected guides,
+angles beyond 20 degrees, and cumulative movement beyond 20 mm from the original
+mapped sample. It recomputes canonical validation, mesh and supplied-anatomy
+clearance. Existing results without a fit retain their original import path.
+
+`capture-inspect conditioning-fit-verify` successfully replays the six recorded
+rotations on this private regenerated candidate. Two synthetic tests exercise
+replay and tampering rejection, including cumulative movement from the original
+sample. All 169 core tests and the unsigned iOS device build pass. This verifies
+the fit verifier and build compatibility; a fitted result still needs a complete
+worker-to-native integration test.
+
+Direction fitting remains a separate post-export experiment in the worker; the
+default conditioning pipeline truthfully retains its pre-fit clearance result.
+The next integration step is to generate the optional record automatically and
+verify the complete result handoff before publishing it. The current successful
+handoff is a local research package. Both ears, inferred scalp
 accuracy, actual growth locations, physical fit and aesthetic suitability remain
 unverified; acceptance remains false.

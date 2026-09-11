@@ -16,6 +16,13 @@ targets:
   PersonalizedHair:
     type: application
     platform: iOS
+    info:
+      path: PersonalizedHair/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
     sources:
       - PersonalizedHair
     dependencies:

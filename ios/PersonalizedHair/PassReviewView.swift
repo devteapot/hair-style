@@ -119,7 +119,7 @@ struct PassReviewView: View {
                     Text("Hair evidence").font(.headline)
                     Text("Recorded preparation: \(pass.manifest.declaredHairCondition?.rawValue ?? "unknown")")
                     if let hairAnalysis {
-                        Text("Inferred hair: \(hairAnalysis.observation.hairPixels) image pixels")
+                        Text("Inferred hair: \(hairAnalysis.observation.hairPixels) image pixels").accessibilityIdentifier("hairAnalysisSummary")
                         if let color = hairAnalysis.observation.recordedColor {
                             HStack {
                                 RoundedRectangle(cornerRadius: 6)
@@ -136,7 +136,7 @@ struct PassReviewView: View {
                     Button("Import hair analysis for this frame") { importHairAnalysis = true }
                         .disabled(frame == nil || report?.valid != true || loading)
                         .accessibilityIdentifier("importHairAnalysis")
-                    if let hairAnalysisError { Text(hairAnalysisError).foregroundStyle(.red) }
+                    if let hairAnalysisError { Text(hairAnalysisError).foregroundStyle(.red).accessibilityIdentifier("hairAnalysisFailure") }
                 }.font(.footnote).foregroundStyle(Theme.ink)
                 if let timing {
                     VStack(alignment: .leading, spacing: 6) {

@@ -48,7 +48,26 @@ final class SessionStore: ObservableObject {
     func addFixture() async {
         do {
             let captureRoot = root
-            _ = try await Task.detached { try SyntheticCapture.create(in: captureRoot) }.value
+            let fixtureURL = try await Task.detached { try SyntheticCapture.create(in: captureRoot) }.value
+            #if targetEnvironment(simulator)
+            if ProcessInfo.processInfo.arguments.contains("--hair-analysis-review-test") {
+                let manifestData = try Data(contentsOf: fixtureURL.appendingPathComponent("manifest.json"))
+                let manifest = try CaptureBundle.load(fixtureURL)
+                let frame = manifest.frames[0]
+                let report: [String: Any] = [
+                    "schemaVersion": 1, "method": "local_segformer_hair_image_v1",
+                    "captureID": manifest.id, "frameID": frame.metadata.id,
+                    "sourceManifestSHA256": EvidenceHash.sha256(manifestData), "imageSHA256": frame.image.sha256,
+                    "imageSize": ["width": frame.metadata.imageSize.width, "height": frame.metadata.imageSize.height],
+                    "captureCondition": "unknown", "captureConditionSource": "unknown",
+                    "observation": ["hairPixels": 500, "interiorPixels": 200, "semanticAccuracyValidated": false,
+                        "recordedColor": ["space": "recorded_rgb_uint8", "sampleCount": 200,
+                            "median": [20, 30, 40], "intrinsicColorCalibrated": false]],
+                    "acceptedForNaturalHairBaseline": false, "registeredToHead": false]
+                let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                try JSONSerialization.data(withJSONObject: report).write(to: documents.appendingPathComponent("Hair analysis fixture.json"), options: .atomic)
+            }
+            #endif
             reload()
         } catch { self.error = error.localizedDescription }
     }

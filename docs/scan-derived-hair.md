@@ -85,8 +85,12 @@ personal hair profile, generate guides or change either preview's haircut.
 
 Core tests cover persistence, unchanged capture integrity, wrong-frame rejection,
 invalid color/measurement claims, preparation provenance and stale manifests.
-The iOS build passes; native file-picker interaction still needs device or
-simulator UI verification.
+The iOS build passes. A simulator UI test imports the report through Files,
+verifies its summary, relaunches the app to check persistence and switches frames
+to confirm that evidence clears. Its screenshot was visually reviewed. The test
+also exposed a missing `UIFileSharingEnabled` key in the built app; the explicit
+Info.plist now preserves Files access, the configured version and camera purpose.
+Physical-device interaction remains unverified for this change.
 
 The same validator is available as `capture-inspect hair-image-review
 CAPTURE_BUNDLE FRAME_ID REPORT.json`. It successfully checked the existing

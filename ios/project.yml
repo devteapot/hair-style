@@ -1,0 +1,53 @@
+name: PersonalizedHair
+options:
+  bundleIdPrefix: dev.personalizedhair
+  deploymentTarget:
+    iOS: '18.0'
+packages:
+  HairCore:
+    path: ..
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    TARGETED_DEVICE_FAMILY: '1'
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    CODE_SIGN_STYLE: Automatic
+targets:
+  PersonalizedHair:
+    type: application
+    platform: iOS
+    sources:
+      - PersonalizedHair
+    dependencies:
+      - package: HairCore
+        product: HairCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.personalizedhair.preview
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Personalized Hair
+        INFOPLIST_KEY_NSCameraUsageDescription: Capture your face and hair to build a personal 3D profile. Recording starts only when you choose Start capture.
+        INFOPLIST_KEY_UIFileSharingEnabled: YES
+        INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '1'
+  PersonalizedHairUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: PersonalizedHair
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  PersonalizedHair:
+    build:
+      targets:
+        PersonalizedHair: all
+    test:
+      targets:
+        - PersonalizedHairUITests

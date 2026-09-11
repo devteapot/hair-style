@@ -1,0 +1,23 @@
+.build/
+.swiftpm/
+.DS_Store
+DerivedData/
+*.xcuserstate
+xcuserdata/
+captures/
+outputs/
+.venv/
+__pycache__/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.mobileprovision
+# Local verification artifacts may contain participant-derived data or images.
+docs/evidence/*
+!docs/evidence/README.md
+.research/
+DerivedData-device/
+ios/PersonalizedHair.xcodeproj/

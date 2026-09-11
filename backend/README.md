@@ -209,3 +209,51 @@ An actual one-job Swift/API test completed in 73.96 seconds. It uploaded the par
 The current `python3 tools/verify_swift_conditioning.py INPUT_DIRECTORY NEW_OUTPUT_DIRECTORY` additionally exercises preparation as a preceding durable job. The input directory retains the five preparation files plus `conditioning-context.json` containing the expected preparation and model-sample hashes. The Swift probe obtains the new preparation's published bytes through the client, uploads them unchanged, and submits conditioning; the helper expects exactly two publications with one attempt each. It starts a temporary loopback API and explicitly enabled local model worker, then shuts the service down. The CLI is `processing-probe http://127.0.0.1:PORT OUTPUT.json --conditioning INPUT_DIRECTORY`. Native screen integration and fresh brief-driven sampling remain open.
 
 The actual two-job chain passes in 82.646 seconds: two publications, one attempt per job, preserved published preparation bytes, idempotent reuse of both jobs/session after client recreation, full Swift geometry/clearance replay and deletion of all session artifacts. The 763-guide result still carries 328 segment intersections and both missing ear regions. Evidence is in `outputs/swift-personal-conditioning-chain/`; the temporary API has shut down.
+
+## Fitted conditioning delivery and offline replay
+
+The conditioning worker now publishes the optional verified direction-fit record
+with the selected mesh while retaining the original source import. See
+[integrated fitting](../docs/integrated-direction-fitting.md). Both conditioning
+and ordinary compilation preserve Swift JSON negative zero during assembly;
+numeric equality alone is insufficient to establish canonical mesh identity.
+A real compiler regression uses an axis-aligned guide and compares every mesh
+scalar encoding with the independently compiled reference.
+
+The existing `verify_swift_conditioning.py` helper now retains the downloaded
+result and its verification inputs in the excluded output directory, deletes the
+service session, closes the client, and independently replays the cache. Set
+`requireDirectionFit: true` in `conditioning-context.json` to require the fitted
+branch rather than silently accept an unfitted fallback. An optional
+`scalp-review.json` in the input directory also exercises creation of a standalone
+review package after service deletion. The output directory must be under the
+workspace's ignored `outputs/` tree because these retained files contain personal
+geometry. They are separate local copies; service deletion does not erase them.
+
+```sh
+caffeinate -i python3 tools/verify_swift_conditioning.py \
+  outputs/PRIVATE_INPUT_DIRECTORY outputs/NEW_PRIVATE_OUTPUT_DIRECTORY
+```
+
+`caffeinate` prevents idle sleep only while this macOS verification command runs.
+It does not extend worker leases or suppress cancellation/deletion.
+
+The fitted two-job Swift run passes in 134.82 seconds with exactly two
+publications and one attempt per job. The client preserves the published
+preparation bytes, reuses both jobs/session after recreation, verifies all 763
+guides and 230,426 mesh vertices, then replays the cached result and produces a
+review package after service deletion. Six declared direction corrections are
+present; supplied-face root/segment conflicts are zero, both ears remain missing,
+and acceptance is false. Evidence is in
+`outputs/swift-fitted-conditioning-delivery/`. The temporary service is stopped
+and its session artifact directory is empty; separate local caches remain.
+
+An independent loopback check also verifies chunk retries, owner-only access,
+byte-exact download and deletion for the fitted result in 111.74 seconds. Its
+first attempt expired its lease without publication during a wall-clock versus
+monotonic-time discontinuity; the cause of that discontinuity was not established.
+That failed attempt is retained in the evidence rather than counted as a success.
+A direct diagnostic run and the subsequent queue retry completed. These are
+individual development runs, not a reliability or latency benchmark. Evidence is
+under `outputs/queued-direction-fit/` and `outputs/queued-direction-fit-retry/`.
+All 35 backend tests pass, and the updated native probe builds successfully.

@@ -8,6 +8,7 @@ from unittest.mock import patch
 from backend.job_store import JobStore
 from backend.artifact_store import ArtifactStore
 from backend.compile_worker import run_one
+from tools.canonical_json import loads
 
 
 class CompileWorkerTests(unittest.TestCase):
@@ -27,12 +28,24 @@ class CompileWorkerTests(unittest.TestCase):
         self.store.close(); self.temp.cleanup()
 
     def test_real_compiler_result_is_bound_and_duplicate_does_not_run(self):
+        fixture = self.root/'fixture/haircut.json'
+        haircut = loads(fixture.read_bytes())
+        root = haircut['guides'][0]['points'][0]
+        haircut['guides'][0]['points'] = [dict(root), dict(root, z=root['z']+0.1)]
+        fixture.write_text(json.dumps(haircut))
+        self.request['haircutSHA256'] = self.files.stage('owner',self.session,fixture.read_bytes())
         job = self.store.submit('owner', self.session, 'one', self.request)
         self.assertTrue(run_one(self.store, self.artifacts, self.cli)['published'])
         output = next((self.artifacts/self.session/'jobs'/job).glob('*/result.json'))
         data = output.read_bytes(); record = self.store.get('owner', job); result = json.loads(data)
         self.assertEqual(record['output_hash'], hashlib.sha256(data).hexdigest())
         self.assertEqual(result['mesh']['haircutSHA256'], result['validation']['haircutSHA256'])
+        reference = self.root/'reference-mesh.json'
+        subprocess.run([str(self.cli),'hair-mesh',str(self.root/'fixture/input.json'),
+            str(self.root/'fixture/haircut.json'),str(reference),'3','1'],check=True,capture_output=True)
+        # Compare scalar encodings too: numeric equality hides a lost -0 sign.
+        self.assertEqual(json.dumps(result['mesh'],sort_keys=True),
+                         json.dumps(loads(reference.read_bytes()),sort_keys=True))
         self.assertEqual(job, self.store.submit('owner', self.session, 'one', self.request))
         self.assertIsNone(run_one(self.store, self.artifacts, self.cli))
         self.assertEqual(self.files.read_result('owner', job), data)

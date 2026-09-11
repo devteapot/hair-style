@@ -62,3 +62,8 @@ actual pipeline, worker assembly and native saved-result replay locally; it does
 not establish remote queue delivery, device UI runtime, physical accuracy, or
 styling quality. Acceptance remains false, and broader milestone gates remain
 open.
+
+Subsequent verification now covers the actual queued/API path and the shared
+Swift client, including preceding preparation, client recreation, deletion and
+offline replay. See [fitted delivery](../backend/README.md#fitted-conditioning-delivery-and-offline-replay)
+for the successful runs and the separately retained expired-lease attempt.

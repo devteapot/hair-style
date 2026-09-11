@@ -18,7 +18,10 @@ from backend.compile_worker import run_one
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('inputs',type=Path);parser.add_argument('output',type=Path);args=parser.parse_args()
-    out=args.output.resolve();out.mkdir(parents=True,exist_ok=False)
+    out=args.output.resolve()
+    if not out.is_relative_to(ROOT/'outputs'):
+        raise ValueError('Conditioning evidence must remain in the excluded outputs directory')
+    out.mkdir(parents=True,exist_ok=False,mode=0o700)
     database=out/'jobs.sqlite';artifacts=out/'artifacts'
     server=make_server(database,artifacts,0)
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()

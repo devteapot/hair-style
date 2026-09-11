@@ -11,6 +11,7 @@ import subprocess
 import time
 from .job_store import JobStore
 from .worker_process import run_stage
+from tools.canonical_json import loads
 
 
 def run_one(store, artifact_root, inspector, haar_workspace=None):
@@ -71,8 +72,8 @@ def run_one(store, artifact_root, inspector, haar_workspace=None):
             return dict(job=job, published=False)
         invoke(['hair-mesh', work/'input.json', work/'haircut.json', work/'mesh.json', '3', '1'])
         output = dict(schemaVersion=1, kind='compiled_hair', request=request,
-            validation=json.loads((work/'validation.json').read_text()),
-            mesh=json.loads((work/'mesh.json').read_text()),
+            validation=loads((work/'validation.json').read_bytes()),
+            mesh=loads((work/'mesh.json').read_bytes()),
             wallSeconds=time.monotonic()-started, personalStyleVerified=False)
         encoded = json.dumps(output, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()
         digest = hashlib.sha256(encoded).hexdigest()

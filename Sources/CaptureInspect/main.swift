@@ -1,10 +1,40 @@
 import Foundation
 import HairCore
+import CoreImage
 
 func run() throws {
     let args = Array(CommandLine.arguments.dropFirst())
     guard let command = args.first else { throw CaptureError.invalid("Usage: capture-inspect fixture OUTPUT_DIR [front|rear] | inspect BUNDLE | ply BUNDLE FRAME_INDEX OUTPUT.ply | register INPUT.json OUTPUT.json | register-captures SOURCE_BUNDLE TARGET_BUNDLE SELECTION.json REPORT.json | surface CAPTURE_ROOT REQUEST.json OUTPUT.json OUTPUT.ply | face-landmarks BUNDLE FRAME_INDEX ROTATION REPORT.json | surface-hash SURFACE.json | canonical-surface SURFACE.json SELECTION.json OUTPUT.json | hair-fixture OUTPUT_DIR | hair-clearance INPUT.json HAIRCUT.json ANATOMY.json REPORT.json | hair-validate INPUT.json HAIRCUT.json REPORT.json | hair-edit INPUT.json BASE.json EDIT.json RESULT.json REPOSITORY_DIR [ANATOMY.json]") }
     switch command {
+    case "image-detail":
+        guard args.count == 4, let index = Int(args[2]), index >= 0 else {
+            throw CaptureError.invalid("image-detail requires BUNDLE FRAME_INDEX OUTPUT.json.")
+        }
+        let bundle = URL(fileURLWithPath: args[1]), output = URL(fileURLWithPath: args[3])
+        guard !FileManager.default.fileExists(atPath: output.path) else {
+            throw CaptureError.invalid("Image-detail output already exists.")
+        }
+        guard try CaptureBundle.inspect(bundle).valid else { throw CaptureError.invalid("Capture integrity failed.") }
+        let manifest = try CaptureBundle.load(bundle)
+        guard index < manifest.frames.count else { throw CaptureError.invalid("Frame index is outside this recording.") }
+        let frame = manifest.frames[index]
+        let data = try Data(contentsOf: bundle.appendingPathComponent(frame.image.path))
+        guard EvidenceHash.sha256(data) == frame.image.sha256,
+              let image = CIImage(data: data, options: [.applyOrientationProperty: false]) else {
+            throw CaptureError.invalid("Image changed or could not be decoded.")
+        }
+        let context = CIContext()
+        let detail = try ImageDetailEvidence.measure(image: image, context: context)
+        struct Report: Encodable {
+            var captureID: String; var frameID: String; var imageSHA256: String
+            var source = "saved_jpeg"
+            var diagnostic: ImageDetailEvidence
+            var scanQualityValidated = false
+            var note = "JPEG compression can change this diagnostic relative to the pre-encoding camera buffer. Lighting, contrast and texture affect detail; no blur or scan-acceptance threshold is calibrated."
+        }
+        try ManifestCoding.encoder().encode(Report(captureID: manifest.id, frameID: frame.metadata.id,
+            imageSHA256: frame.image.sha256, diagnostic: detail)).write(to: output, options: .atomic)
+        print("Measured saved JPEG image detail. Original capture unchanged; scan quality remains unverified.")
     case "preparation-consume":
         guard args.count == 8 else { throw CaptureError.invalid("preparation-consume requires RESULT.json OUTPUT_SHA256 INPUT.json BRIEF.json MAPPING.json ANATOMY.json OUTPUT_INPUT.json.") }
         func readBounded(_ path:String, maximum:Int) throws -> Data {

@@ -122,6 +122,9 @@ public enum CaptureBundle {
         if let fraction = m.quality.validDepthFraction, !fraction.isFinite || !(0...1).contains(fraction) {
             throw CaptureError.invalid("Invalid valid-depth fraction.")
         }
+        if let detail = m.quality.imageDetail, !detail.isValid {
+            throw CaptureError.invalid("Invalid image-detail diagnostic.")
+        }
         guard m.quality.headPoseAvailable == (m.headPose != nil) else {
             throw CaptureError.invalid("Head-pose availability must match its recorded evidence.")
         }

@@ -271,6 +271,9 @@ final class CaptureEngine: NSObject, AVCaptureDataOutputSynchronizerDelegate, AR
 
     private func persist(image: CVPixelBuffer, metadata: FrameMetadata, depth: Data, confidence: Data? = nil, exif: [String:Any] = [:]) throws {
         guard let writer else { return }
+        var metadata = metadata
+        // Diagnostic failure must not discard otherwise usable sensor evidence.
+        metadata.quality.imageDetail = try? ImageDetailEvidence.measure(image: CIImage(cvPixelBuffer: image), context: context)
         let jpeg = try CameraEvidence.imageJPEG(image, context: context, exif:exif)
         try writer.append(metadata: metadata, imageJPEG: jpeg, depth: depth, confidence: confidence)
         let update = CaptureUpdate(jpeg: jpeg, metadata: metadata, frameCount: writer.manifest.frames.count)

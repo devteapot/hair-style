@@ -113,6 +113,7 @@ public struct DeviceReport: Codable, Sendable {
 }
 
 public struct FrameQuality: Codable, Sendable {
+    public var imageDetail: ImageDetailEvidence? = nil
     public var validDepthFraction: Double?
     public var medianDepthMeters: Double?
     public var synchronizationDeltaSeconds: Double?

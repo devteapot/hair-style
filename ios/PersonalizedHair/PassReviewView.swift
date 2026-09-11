@@ -114,6 +114,12 @@ struct PassReviewView: View {
                         metric("Pose", frame.metadata.poseSource)
                         metric("Mirrored data", frame.metadata.mirrored ? "Yes" : "No")
                     }.font(.caption)
+                    if let detail = frame.metadata.quality.imageDetail {
+                        Text("Center image detail: \(detail.laplacianVariance, specifier: "%.5f") · contrast: \(detail.lumaStandardDeviation, specifier: "%.3f")")
+                            .font(.caption).accessibilityIdentifier("imageDetailDiagnostic")
+                        Text("Diagnostic only. Low detail can reflect blur, lighting or smooth hair. It does not verify focus, head coverage or scan quality.")
+                            .font(.caption).foregroundStyle(Theme.ink.opacity(0.75))
+                    }
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Hair evidence").font(.headline)

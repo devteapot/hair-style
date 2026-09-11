@@ -131,3 +131,41 @@ around highlights; no orientation-accuracy or styling-quality gate is claimed.
 Seven synthetic tests now cover image observations and orientation, including
 known horizontal/vertical/diagonal texture tangents, contrast reversal,
 quarter-turn coordinate behavior, absent texture and boundary exclusions.
+
+### Projected-guide comparison
+
+`tools/compare_hair_image.py` compares a saved guide asset against one frame's
+hair mask and texture axes. It requires an explicit rigid transform into the
+frame's optical camera coordinates (x right, y down, z forward, meters). Only
+aligned rear-camera or synthetic pinhole images are supported; unrectified
+front-camera images are rejected until this path implements lens correction.
+
+```sh
+.research/metal-env/bin/python tools/compare_hair_image.py \
+  CAPTURE_BUNDLE IMAGE_EVIDENCE_DIRECTORY HAIRCUT_JSON ALIGNMENT_JSON OUTPUT_JSON
+```
+
+The alignment JSON contains `cameraFromHairRowMajor` (16 numbers),
+`haircutFileSHA256` and `evidenceReportSHA256`. These hashes bind the transform
+to the exact files, but do not validate anatomical registration. The tool checks
+the manifest/frame identity, raster hashes, dimensions, rigid transform and
+texture support before comparison. The output records all three input hashes.
+
+Segments are sampled in image space at a maximum spacing of two pixels. The
+report counts out-of-frame samples, samples inside the hair mask, and samples
+with orientation evidence. It reports median and p95 axial errors from 0–90°.
+Camera-crossing segments and degenerate projections are excluded and counted.
+Absent evidence gives null errors rather than a perfect score. Segment
+subdivision affects sample weighting; sparse guides cannot provide a complete
+silhouette, density or reconstruction score. Occlusion is not yet tested.
+
+Four synthetic tests cover scaled intrinsics, undirected comparison, orthogonal
+error, missing support, camera crossings, invalid transforms/calibration and an
+end-to-end file-bound CLI comparison with stale-input rejection. Physical
+registration and occlusion checks remain necessary before using this diagnostic
+as a fitting objective. It never automatically accepts a haircut or registration.
+
+```sh
+.research/metal-env/bin/python -m unittest discover -s tools \
+  -p test_compare_hair_image.py
+```

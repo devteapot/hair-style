@@ -59,7 +59,7 @@ def main():
     parser.add_argument('--compare-cpu', action='store_true')
     parser.add_argument('--confidence', type=float, default=0.8)
     parser.add_argument('--target', choices=['face', 'hair'], default='face')
-    parser.add_argument('--capture-condition', choices=['tied', 'untied', 'unknown'], default='unknown')
+    parser.add_argument('--capture-condition', choices=['tied', 'untied', 'unknown'])
     args = parser.parse_args()
     if not 0.5 <= args.confidence <= 0.99:
         raise ValueError('Use an explicit confidence threshold between 0.5 and 0.99')
@@ -68,6 +68,8 @@ def main():
     subprocess.run([str(cli), 'inspect', str(bundle)], check=True, capture_output=True)
     manifest_data = (bundle/'manifest.json').read_bytes()
     manifest = json.loads(manifest_data)
+    from hair_image_observations import capture_condition
+    hair_condition, hair_condition_source = capture_condition(manifest, args.capture_condition)
     if not 0 <= args.frame_index < len(manifest['frames']):
         raise ValueError('Frame index out of bounds')
     frame = manifest['frames'][args.frame_index]
@@ -158,8 +160,8 @@ def main():
                   'rotationToUpright': args.rotation, 'confidenceThreshold': args.confidence,
                   'confidenceMode': 'hair_class_posterior', 'device': args.device,
                   'timingsSeconds': timings, 'cpuAgreement': agreement,
-                  'captureCondition': args.capture_condition,
-                  'captureConditionSource': 'operator_assertion' if args.capture_condition != 'unknown' else 'unknown',
+                  'captureCondition': hair_condition,
+                  'captureConditionSource': hair_condition_source,
                   'labelsSHA256': digest(labels_data), 'posteriorSHA256': digest(confidence_data),
                   'maskSHA256': digest(mask_data), 'interiorMaskSHA256': digest(interior_data),
                   'textureAxisSHA256': digest(orientation_data), 'textureOrientation': orientation_report,

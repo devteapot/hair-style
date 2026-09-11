@@ -1,9 +1,16 @@
 import unittest
 import numpy as np
-from hair_image_observations import observe_hair, texture_orientation
+from hair_image_observations import observe_hair, texture_orientation, capture_condition
 
 
 class HairImageObservationTests(unittest.TestCase):
+    def test_capture_condition_preserves_unknowns_and_rejects_conflicts(self):
+        self.assertEqual(capture_condition({'kind': 'natural_hair'}), ('unknown', 'unknown'))
+        self.assertEqual(capture_condition({'declaredHairCondition': 'untied'}), ('untied', 'participant_declaration'))
+        self.assertEqual(capture_condition({}, 'tied'), ('tied', 'operator_assertion'))
+        with self.assertRaises(ValueError): capture_condition({'declaredHairCondition':'tied'}, 'untied')
+        with self.assertRaises(ValueError): capture_condition({'declaredHairCondition':'dry'})
+
     def test_native_bounds_and_boundary_color_exclusion(self):
         rgb = np.zeros((30, 40, 3), dtype=np.uint8)
         labels = np.zeros((30, 40), dtype=np.uint8)

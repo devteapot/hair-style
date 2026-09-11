@@ -2,6 +2,20 @@
 import numpy as np
 
 
+def capture_condition(manifest, override=None):
+    declared = manifest.get('declaredHairCondition')
+    allowed = ('tied', 'untied', 'unknown')
+    if declared is not None and declared not in allowed or override is not None and override not in allowed:
+        raise ValueError('Unknown capture condition')
+    if override is not None:
+        if declared in ('tied', 'untied') and override != declared:
+            raise ValueError('Capture condition conflicts with participant declaration')
+        return override, 'operator_assertion'
+    if declared in ('tied', 'untied'):
+        return declared, 'participant_declaration'
+    return 'unknown', 'unknown'
+
+
 def observe_hair(rgb, labels, posterior, threshold=0.8, interior_radius=2):
     rgb, labels, posterior = np.asarray(rgb), np.asarray(labels), np.asarray(posterior)
     if rgb.dtype != np.uint8 or rgb.ndim != 3 or rgb.shape[2] != 3 or min(rgb.shape[:2]) < 1:

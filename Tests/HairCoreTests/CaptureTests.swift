@@ -2,6 +2,22 @@ import XCTest
 @testable import HairCore
 
 final class CaptureTests: XCTestCase {
+    func testDeclaredHairConditionPersistsWithoutInferringLegacyPreparation() throws {
+        let root = try temporaryDirectory()
+        let bundle = try SyntheticCapture.create(in: root)
+        var legacy = try CaptureBundle.load(bundle)
+        XCTAssertNil(legacy.declaredHairCondition)
+        legacy.kind = .naturalHair
+        let legacyData = try ManifestCoding.encoder().encode(legacy)
+        XCTAssertNil(try ManifestCoding.decoder().decode(CaptureManifest.self, from: legacyData).declaredHairCondition)
+        let writer = try CaptureBundleWriter(root: root, subjectSessionID: legacy.subjectSessionID,
+            kind: .naturalHair, source: .syntheticFixture, device: legacy.device,
+            consentVersion: legacy.consentVersion, declaredHairCondition: .untied)
+        XCTAssertEqual(try CaptureBundle.load(writer.url).declaredHairCondition, .untied)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: writer.url.appendingPathComponent("manifest.json"))) as? [String: Any])
+        XCTAssertEqual(object["declaredHairCondition"] as? String, "untied")
+    }
+
     func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

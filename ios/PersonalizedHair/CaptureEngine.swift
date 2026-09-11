@@ -46,7 +46,7 @@ final class CaptureEngine: NSObject, AVCaptureDataOutputSynchronizerDelegate, AR
 
     deinit { notifications.forEach(NotificationCenter.default.removeObserver) }
 
-    func start(kind: CaptureKind, root: URL, subjectSessionID: String, device: DeviceReport, denseFrontSampling: Bool = false, trackedFrontCapture: Bool = false) {
+    func start(kind: CaptureKind, root: URL, subjectSessionID: String, device: DeviceReport, denseFrontSampling: Bool = false, trackedFrontCapture: Bool = false, hairCondition: HairCaptureCondition = .unknown) {
         queue.async {
             guard self.writer == nil else { return }
             do {
@@ -60,7 +60,8 @@ final class CaptureEngine: NSObject, AVCaptureDataOutputSynchronizerDelegate, AR
                 self.trackedCameraRate = nil
                 if kind == .frontFace && !self.trackedFrontCapture { try self.configureFront() }
                 let writer = try CaptureBundleWriter(root: root, subjectSessionID: subjectSessionID, kind: kind,
-                    source: .sensor, device: device, consentVersion: "local-capture-adult-v1", sampleRateHz: kind == .frontFace && denseFrontSampling ? 15 : 3)
+                    source: .sensor, device: device, consentVersion: "local-capture-adult-v1", sampleRateHz: kind == .frontFace && denseFrontSampling ? 15 : 3,
+                    declaredHairCondition: hairCondition)
                 self.writer = writer
                 if self.trackedFrontCapture {
                     guard ARFaceTrackingConfiguration.isSupported else { throw CaptureError.invalid("Face tracking is unavailable.") }

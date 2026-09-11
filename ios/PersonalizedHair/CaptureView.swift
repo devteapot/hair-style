@@ -21,7 +21,7 @@ final class CaptureViewModel: ObservableObject {
         engine.onError = { [weak self] message in self?.error = message }
     }
 
-    func start(kind: CaptureKind, store: SessionStore, denseFrontSampling: Bool = false, trackedFrontCapture: Bool = false) async {
+    func start(kind: CaptureKind, store: SessionStore, denseFrontSampling: Bool = false, trackedFrontCapture: Bool = false, hairCondition: HairCaptureCondition = .unknown) async {
         guard !recording && !preparing else { return }
         preparing = true; error = nil; lastUpdate = nil
         let request = UUID()
@@ -30,7 +30,7 @@ final class CaptureViewModel: ObservableObject {
         // Permission can resolve after the view disappears or the app backgrounds.
         guard startRequest == request else { return }
         guard permitted else { preparing = false; error = "Camera access is off. Enable it in Settings to capture your head."; return }
-        engine.start(kind: kind, root: store.root, subjectSessionID: store.subjectSessionID, device: DeviceCapabilities.report(), denseFrontSampling: denseFrontSampling, trackedFrontCapture: trackedFrontCapture)
+        engine.start(kind: kind, root: store.root, subjectSessionID: store.subjectSessionID, device: DeviceCapabilities.report(), denseFrontSampling: denseFrontSampling, trackedFrontCapture: trackedFrontCapture, hairCondition: hairCondition)
     }
 
     func stop(interrupted: Bool = false) {
@@ -48,6 +48,7 @@ struct CaptureView: View {
     @State private var consent = false
     @State private var denseFrontSampling = false
     @State private var trackedFrontCapture = false
+    @State private var hairCondition: HairCaptureCondition = .unknown
 
     var body: some View {
         ScrollView {
@@ -80,6 +81,18 @@ struct CaptureView: View {
                 }
                 if let error = model.error { Text(error).foregroundStyle(.red).accessibilityIdentifier("captureError") }
 
+                Picker("Hair in this recording", selection: $hairCondition) {
+                    Text("Not specified").tag(HairCaptureCondition.unknown)
+                    Text("Tied or pinned back").tag(HairCaptureCondition.tied)
+                    Text("Loose").tag(HairCaptureCondition.untied)
+                }
+                .foregroundStyle(Theme.ink)
+                .disabled(model.recording || model.preparing)
+                .accessibilityIdentifier("captureHairCondition")
+                if kind == .naturalHair {
+                    Text("For natural shape and texture, leave your hair loose and dry. Your selection is saved with this recording.")
+                        .font(.footnote).foregroundStyle(Theme.ink)
+                }
                 if kind == .frontFace {
                     Toggle("Retain head tracking (experimental)", isOn: $trackedFrontCapture)
                         .disabled(model.recording || model.preparing)
@@ -103,7 +116,7 @@ struct CaptureView: View {
                 }
                 Button {
                     if model.recording { model.stop() }
-                    else { Task { await model.start(kind: kind, store: store, denseFrontSampling: denseFrontSampling, trackedFrontCapture: trackedFrontCapture) } }
+                    else { Task { await model.start(kind: kind, store: store, denseFrontSampling: denseFrontSampling, trackedFrontCapture: trackedFrontCapture, hairCondition: hairCondition) } }
                 } label: {
                     Label(model.recording ? "Finish capture" : "Start capture", systemImage: model.recording ? "stop.fill" : "record.circle")
                         .frame(maxWidth: .infinity).padding(.vertical, 8)

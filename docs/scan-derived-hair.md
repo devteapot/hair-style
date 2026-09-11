@@ -78,10 +78,18 @@ With the existing pinned face-parsing model and local research environment:
 ```
 
 Choose rotation from the recorded image; `clockwise90` is an example, not a
-universal sensor rule. The condition is an operator assertion, not an automatic
-classifier. Use `tied` for diagnostic processing of pinned hair, or `unknown`
-when preparation has not been confirmed. No output is automatically accepted
-as a natural-hair baseline, even when `untied` is asserted.
+universal sensor rule. New app captures can store `declaredHairCondition` from
+the “Hair in this recording” selection: tied, untied or unknown. The selection
+defaults to unknown and is disabled during preparation/recording. It records a
+participant declaration, not a camera classification; dry preparation remains
+guidance, not a measured property. Legacy manifests without the field stay
+unknown, including those labeled `natural_hair`.
+
+Omit `--capture-condition` to use the saved declaration. For older captures, an
+explicit flag records an operator assertion; use `tied` for diagnostic processing
+of pinned hair. A flag contradicting a saved tied/untied declaration is rejected.
+No output is automatically accepted as a natural-hair baseline, even when
+`untied` is declared.
 
 The command verifies the capture and pinned local weights, preserves full native
 RGB resolution, and writes class labels, hair posterior, binary hair mask, an

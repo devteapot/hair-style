@@ -16,6 +16,11 @@ public enum CaptureStatus: String, Codable, Sendable {
     case recording, completed, interrupted
 }
 
+/// Participant declaration, not a classification inferred from the camera or capture kind.
+public enum HairCaptureCondition: String, Codable, CaseIterable, Sendable {
+    case unknown, tied, untied
+}
+
 public struct PixelSize: Codable, Equatable, Sendable {
     public var width: Int
     public var height: Int
@@ -205,6 +210,7 @@ public struct CaptureManifest: Codable, Sendable {
     public var requestedSampleRateHz: Double
     public var frames: [StoredFrame]
     public var notes: [String]
+    public var declaredHairCondition: HairCaptureCondition? = nil
 }
 
 public enum CaptureError: Error, LocalizedError {

@@ -23,7 +23,8 @@ public final class CaptureBundleWriter {
     public private(set) var manifest: CaptureManifest
 
     public init(root: URL, subjectSessionID: String, kind: CaptureKind, source: CaptureSource,
-                device: DeviceReport, consentVersion: String, sampleRateHz: Double = 3) throws {
+                device: DeviceReport, consentVersion: String, sampleRateHz: Double = 3,
+                declaredHairCondition: HairCaptureCondition? = nil) throws {
         guard !consentVersion.isEmpty, sampleRateHz > 0, sampleRateHz.isFinite else {
             throw CaptureError.invalid("Consent version and a valid sample rate are required.")
         }
@@ -32,7 +33,8 @@ public final class CaptureBundleWriter {
         url = root.appendingPathComponent(id, isDirectory: true)
         manifest = CaptureManifest(id: id, subjectSessionID: subjectSessionID, kind: kind, source: source,
             status: .recording, createdAt: now, updatedAt: now, consentVersion: consentVersion,
-            device: device, requestedSampleRateHz: sampleRateHz, frames: [], notes: [])
+            device: device, requestedSampleRateHz: sampleRateHz, frames: [], notes: [],
+            declaredHairCondition: declaredHairCondition)
         try FileManager.default.createDirectory(at: url.appendingPathComponent("frames"), withIntermediateDirectories: true)
         try checkpoint()
     }

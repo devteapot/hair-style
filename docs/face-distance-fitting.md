@@ -102,3 +102,40 @@ Canonical validation rejects the substituted research curve for its length viola
 The final replay completes in 13.95 seconds and checks all 42 candidate orientations. Independent checks confirm exact roots and bindings, all regional length bounds, pairwise curve-distance preservation to 2.43e-17 m, and maximum movement 14.144 mm from the original mapping. All candidates still collide; best remaining segment counts are 24, 12, 10, 10, 16, and 10 for guides 632, 633, 656, 657, 678, and 679. These results do not improve the saved candidate. This confirms that preserving length alone does not make the conservative plane objective adequate for the observed geometry.
 
 Artifacts remain under `outputs/continuous-root-rotation-v3/`. The first run completed geometry checking but failed JSON report serialization; the corrected runs retain native booleans and record the original mapping as the cumulative movement reference. No candidate is promoted, and the default conditioning pipeline and native studio remain unchanged.
+
+## Local bending with segment lengths preserved
+
+`tools/root_bending.py` rotates individual segment vectors near the root, then
+reconstructs the curve by cumulative summation. Roots and every segment length
+are preserved; this allows local shape changes that a whole-curve rotation cannot
+make. Tail segment vectors remain unchanged, although their positions can move.
+It does not preserve curvature or establish a natural-looking hairstyle.
+
+`tools/probe_local_root_bending.py INPUT MAPPING SOURCE HAIRCUT ANATOMY OUTPUT`
+optimizes three smoothness/rotation regularization weights, using float64 PyTorch
+on CPU. The first approximately 12 mm may bend. It checks the existing inferred
+envelope and 20 mm cumulative movement bound against the original mapped decode,
+then runs full canonical continuous-segment clearance. The default objective uses
+departure planes and a 20° per-segment rotation cap. `--objective distance` instead
+uses unsigned distances to nearby triangles, sampling segment thirds and vertices;
+the exact final checker still uses the complete anatomy. Neither objective proves
+anatomical inside/outside status. Optional `--maximum-segment-angle-degrees 45|90`
+explicitly explores larger bends; it does not change a production default.
+
+All 15 root-related tests and five surface-distance tests pass, including known
+bends, exact segment lengths, retained tail vectors, batching and numerical
+gradients. Four actual experiments each test 18 candidates: planes at 20°, then
+surface distance at 20°, 45° and 90°. All 72 preserve roots/bindings and segment
+lengths and remain within the existing cumulative movement/envelope bounds. None
+clears all supplied anatomy. The 20° distance runs reach the angle cap; increasing
+it gives modest improvement, but 45° and 90° yield the same collision counts here.
+Thus the 20° cap alone does not explain the failure.
+
+An independently replayed research copy combines the lowest-count results from
+the larger-angle runs. Full canonical checking reports **47 segment conflicts,
+down from 68, with zero root violations**; all six affected guides still collide.
+The other 757 guide records are unchanged. This is partial geometric improvement,
+not a usable or physically validated haircut, and no app selection is replaced.
+Outputs are private under `outputs/local-root-bending*`. Repeating this local
+unsigned-distance optimization is not justified without a new constraint or
+better anatomical evidence.

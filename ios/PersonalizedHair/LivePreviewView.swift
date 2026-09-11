@@ -12,7 +12,7 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
     @Published var preparing = false
     @Published var error: String?
     let view = ARSCNView(frame: .zero)
-    let inspectionView = SCNView(frame: .zero)
+    let inspectionView = HairInspectionView(frame: .zero)
     @Published var assetIdentity = ""
     private let hairRoot = SCNNode()
     private let faceOccluder = SCNNode()
@@ -134,15 +134,12 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
                 geometry.firstMaterial?.isDoubleSided = true
                 scene.rootNode.addChildNode(SCNNode(geometry: geometry))
             }
-            let all = scalp.vertices + mesh.vertices
-            let xs = all.map(\.x), ys = all.map(\.y), zs = all.map(\.z)
-            let center = SCNVector3(Float((xs.min()!+xs.max()!)/2),Float((ys.min()!+ys.max()!)/2),Float((zs.min()!+zs.max()!)/2))
-            let extent = max(xs.max()!-xs.min()!, max(ys.max()!-ys.min()!, zs.max()!-zs.min()!))
-            let camera = SCNNode(); camera.camera = SCNCamera(); camera.camera?.zNear = 0.001; camera.camera?.zFar = 20
-            camera.position = SCNVector3(center.x + Float(extent*1.2),center.y + Float(extent*0.8),center.z + Float(max(0.2,extent*2)))
-            camera.look(at: center, up: SCNVector3(0,1,0), localFront: SCNVector3(0,0,-1))
-            scene.rootNode.addChildNode(camera); inspectionView.scene = scene; inspectionView.pointOfView = camera
-            inspectionView.defaultCameraController.target = center
+            let all = scalp.vertices + mesh.vertices + (observedFace?.vertices.map(\.position) ?? [])
+            if let framing = try? InspectionCameraFrame(points: all) {
+                let camera = SCNNode(); camera.camera = SCNCamera()
+                scene.rootNode.addChildNode(camera); inspectionView.scene = scene
+                inspectionView.configure(camera: camera, framing: framing)
+            }
             let source = prepared.0.input.scalp.triangleOrigins.contains(.synthetic) ? "Synthetic test asset" : "Imported asset"
             assetIdentity = "\(source) · Revision \(mesh.haircutRevision) · \(mesh.haircutSHA256)"
             package = prepared.0; ready = true; preparing = false
@@ -376,6 +373,40 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
         Task { @MainActor [weak self] in
             self?.stop(); self?.error = "AR tracking failed: " + message
         }
+    }
+}
+
+final class HairInspectionView: SCNView {
+    private var framing: InspectionCameraFrame?
+    private var fittedSize: CGSize = .zero
+
+    func configure(camera: SCNNode, framing: InspectionCameraFrame) {
+        self.framing = framing; pointOfView = camera; fittedSize = .zero
+        fitIfNeeded()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        fitIfNeeded()
+    }
+
+    private func fitIfNeeded() {
+        guard bounds.width > 0, bounds.height > 0, bounds.size != fittedSize,
+              let framing, let node = pointOfView, let camera = node.camera,
+              let scale = try? framing.scale(viewportWidth: bounds.width, viewportHeight: bounds.height) else { return }
+        fittedSize = bounds.size
+        let distance = max(0.1, 2 * framing.halfDepth + scale * 2 + 0.01)
+        let p = SCNVector3(Float(framing.target.x + framing.towardCamera.x * distance),
+                           Float(framing.target.y + framing.towardCamera.y * distance),
+                           Float(framing.target.z + framing.towardCamera.z * distance))
+        let center = SCNVector3(Float(framing.target.x), Float(framing.target.y), Float(framing.target.z))
+        SCNTransaction.begin(); SCNTransaction.animationDuration = 0
+        camera.usesOrthographicProjection = true; camera.projectionDirection = .vertical
+        camera.orthographicScale = scale; camera.zNear = 0.001; camera.zFar = distance + framing.halfDepth + 0.1
+        node.position = p
+        node.look(at: center, up: SCNVector3(0,1,0), localFront: SCNVector3(0,0,-1))
+        defaultCameraController.target = center
+        SCNTransaction.commit()
     }
 }
 

@@ -94,8 +94,9 @@ clearance, performs undo/redo, and loads the exact selected revision into live
 inspection. The persisted full simulator hash equals the independent CLI edit
 hash. Screenshots were inspected. The simulator uses synthetic tracker landmarks
 and never starts a camera: this verifies revision transport, not physical alignment,
-occlusion, realism or sustained device performance. The live inspection currently
-frames this asset small; acceptable preview framing remains open.
+occlusion, realism or sustained device performance. That initial run framed the
+asset small; subsequent [viewport-aware inspection framing](live-inspection-framing.md)
+corrects the initial view and retains the same edited revision.
 
 The private test fixture is `Documents/normal-offset-review-test.json`, selected by
 the simulator-only `--normal-offset-review-test` flag. It uses its own

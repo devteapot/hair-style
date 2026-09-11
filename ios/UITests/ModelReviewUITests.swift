@@ -1,6 +1,45 @@
 import XCTest
 
 final class ModelReviewUITests:XCTestCase {
+    func testInferredOffsetCandidateTrimsAtBriefMinimumAndReachesLiveInspection() throws {
+        // Requires the private face-clear package in Documents/normal-offset-review-test.json.
+        // Tracker landmarks remain synthetic; no camera or physical alignment is tested.
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchArguments=["--normal-offset-review-test"];open(app)
+        let load=app.buttons["loadPreparedModelReview"]
+        if !load.waitForExistence(timeout:3) {
+            let delete=app.buttons["deleteHairFixture"];reveal(delete,app);delete.tap();app.alerts.buttons["Delete"].tap()
+        }
+        XCTAssertTrue(load.waitForExistence(timeout:10));reveal(load,app);load.tap()
+        status("Saved · revision 1",app)
+        let original=app.staticTexts["selectedHairHash"].label
+        let trim=app.buttons["previewFringe"];reveal(trim,app)
+        XCTAssertTrue(trim.isEnabled)
+        XCTAssertFalse(app.sliders["fringeLengthSlider"].exists)
+        XCTAssertTrue(app.staticTexts["fringeTrimRange"].label.contains("40 mm"))
+        trim.tap()
+        let save=app.buttons["saveHairRevision"]
+        XCTAssertTrue(save.waitForExistence(timeout:90));reveal(save,app);save.tap()
+        status("Saved · revision 2",app)
+        let edited=app.staticTexts["selectedHairHash"].label;XCTAssertNotEqual(edited,original)
+        reveal(trim,app);XCTAssertFalse(trim.isEnabled)
+        app.terminate();open(app);status("Saved · revision 2",app)
+        XCTAssertEqual(app.staticTexts["selectedHairHash"].label,edited)
+        let clearance=app.staticTexts["faceClearanceStatus"];reveal(clearance,app)
+        let clear=XCTNSPredicateExpectation(predicate:NSPredicate(format:"label == %@","No conflicts with the supplied face surface"),object:clearance)
+        wait(for:[clear],timeout:90)
+        XCTAssertTrue(app.staticTexts["researchRevisionNotice"].label.contains("inferred"))
+        let image=XCTAttachment(screenshot:app.screenshot());image.name="Face-clear trimmed revision";image.lifetime = .keepAlways;add(image)
+        let undo=app.buttons["undoHairRevision"];reveal(undo,app);undo.tap();status("Saved · revision 1",app)
+        let redo=app.buttons["redoHairRevision"];reveal(redo,app);redo.tap();status("Saved · revision 2",app)
+        XCTAssertEqual(app.staticTexts["selectedHairHash"].label,edited)
+        app.navigationBars.buttons.firstMatch.tap()
+        let live=app.buttons["openLiveLab"];reveal(live,app);live.tap();app.buttons["loadPreviewFixture"].tap()
+        let identity=app.staticTexts["importedHairIdentity"];XCTAssertTrue(identity.waitForExistence(timeout:90))
+        XCTAssertTrue(identity.label.contains("Revision 2"));XCTAssertTrue(identity.label.contains(edited))
+        XCTAssertFalse(app.buttons["Start camera"].exists)
+        let liveImage=XCTAttachment(screenshot:app.screenshot());liveImage.name="Exact trimmed revision in live inspection";liveImage.lifetime = .keepAlways;add(liveImage)
+    }
     private func openConditioningPreparation(_ app:XCUIApplication) {
         let button=app.buttons["preparePersonalGeneration"];reveal(button,app)
         if button.frame.midY > app.frame.height*0.7 {

@@ -71,3 +71,34 @@ collision-free result does not validate that estimate. Acceptance remains false.
 The next integration should expose this correction as inferred and preserve the
 source evidence while improving the scalp/face fit, rather than silently describing
 these roots as measured attachments.
+
+## Trim and native preview handoff
+
+The face-clear candidate exposed a fringe-control bug: its shortest guides and
+brief minimum are both 40 mm, but the UI disabled that valid target while offering
+shorter targets that the brief rejects. `HairTrimOptions` now derives whole-mm
+targets from the brief and shortest current guide. A target equal to the shortest
+guide remains enabled when longer guides can be trimmed; unavailable targets and
+no-op edits are disabled. Tests cover this boundary, fractional ranges and rounding.
+
+An actual 40 mm trim changes 146 fringe guides, preserves the other 617 guide
+records, and retains every root binding and material. Independent checks confirm
+all trimmed curves are prefixes of their original paths, with the final point on
+the original segment (maximum discrepancy 7.83 × 10⁻¹⁸ m). Full supplied-face
+clearance still passes. The canonical edited revision is
+`2d587c763b44d17a1b40a49c97f46829341730cdb394fb3637d9b73435d30500`.
+
+All 165 core tests and the unsigned iOS build pass. An isolated simulator UI test
+imports this private research package, trims at 40 mm, saves, relaunches, confirms
+clearance, performs undo/redo, and loads the exact selected revision into live
+inspection. The persisted full simulator hash equals the independent CLI edit
+hash. Screenshots were inspected. The simulator uses synthetic tracker landmarks
+and never starts a camera: this verifies revision transport, not physical alignment,
+occlusion, realism or sustained device performance. The live inspection currently
+frames this asset small; acceptable preview framing remains open.
+
+The private test fixture is `Documents/normal-offset-review-test.json`, selected by
+the simulator-only `--normal-offset-review-test` flag. It uses its own
+`NormalOffsetReviewTest` studio directory. Neither the phone nor the ordinary
+studio selection is changed. Evidence is under `outputs/normal-offset-trim-ui-private/`
+and `outputs/normal-root-offsets/trim-*`.

@@ -23,6 +23,7 @@ struct HairLabView: View {
         if ProcessInfo.processInfo.arguments.contains("--refined-model-review-test") { name = "refined-model-review-test.json" }
         if ProcessInfo.processInfo.arguments.contains("--prepared-pipeline-model-review-test") { name = "prepared-pipeline-model-review-test.json" }
         if ProcessInfo.processInfo.arguments.contains("--fresh-short-review-test") { name = "fresh-short-review-test.json" }
+        if ProcessInfo.processInfo.arguments.contains("--normal-offset-review-test") { name = "normal-offset-review-test.json" }
         #endif
         return FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0].appendingPathComponent(name)
     }
@@ -51,10 +52,9 @@ struct HairLabView: View {
         if let preview = store.preview { selected.haircut = preview.haircut }
         return selected
     }
-    private var maximumFringe: Double {
-        guard let cut = store.snapshot?.selected.haircut else { return 100 }
-        let lengths = cut.guides.filter { $0.region == .fringe }.compactMap { try? HaircutValidator.arcLength($0.points) }
-        return max(5, floor((lengths.min() ?? 0.1) * 1000 + 1e-5))
+    private var fringeTrimOptions: HairTrimOptions? {
+        guard let selected = store.snapshot?.selected else { return nil }
+        return try? HairTrimOptions(input: selected.input, haircut: selected.haircut, region: .fringe)
     }
     var body: some View {
         ScrollView {
@@ -98,7 +98,7 @@ struct HairLabView: View {
                     Text(modelReview ? "Fringe \(range(record.haircut,region:.fringe)) mm · crown \(range(record.haircut,region:.crown)) mm" : "Fringe \(fringeLength(record.haircut)) mm · crown \(crownLength(record.haircut)) mm")
                         .font(.caption.monospacedDigit()).accessibilityIdentifier("hairLengths")
                     Toggle("Compare with original", isOn: $compare).accessibilityIdentifier("compareHairOriginal")
-                    Text(modelReview ? "Orbit with one finger; pinch to zoom. Gray is the recorded face, amber the inferred scalp, and green the fringe. Guides are enlarged for inspection." : "Orbit with one finger; pinch to zoom. Colored root dots distinguish the fringe and crown. Hair uses the saved material color.")
+                    Text(modelReview ? "Orbit with one finger; pinch to zoom. Gray is the recorded face and amber the inferred scalp. Hair uses the saved material color. Guides are enlarged for inspection." : "Orbit with one finger; pinch to zoom. Colored root dots distinguish the fringe and crown. Hair uses the saved material color.")
                         .font(.footnote).foregroundStyle(Theme.ink.opacity(0.8))
                     HaircutExplanationView(record: record)
                     NavigationLink("Preferences for a new design") {
@@ -110,15 +110,24 @@ struct HairLabView: View {
                     Divider()
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Fringe length · \(Int(fringeMM)) mm").font(.subheadline.weight(.medium))
-                        if maximumFringe > 5 {
-                            Slider(value: $fringeMM, in: 5...maximumFringe, step: 1)
+                        if let range = fringeTrimOptions?.targetRangeMillimeters, range.lowerBound < range.upperBound {
+                            Slider(value: $fringeMM, in: range, step: 1)
                                 .accessibilityLabel("Fringe length in millimeters").accessibilityIdentifier("fringeLengthSlider")
                                 .onChange(of: fringeMM) { _, _ in store.discard() }
                         }
                         Button("Preview shorter fringe") {
                             compare = false
                             Task { await store.preview(operation: .shortenToLength, region: .fringe, value: fringeMM/1000) }
-                        }.disabled(fringeMM >= maximumFringe).accessibilityIdentifier("previewFringe")
+                        }.disabled(fringeTrimOptions?.canTrim(toMillimeters: fringeMM) != true).accessibilityIdentifier("previewFringe")
+                        if let range = fringeTrimOptions?.targetRangeMillimeters {
+                            Text(range.lowerBound == range.upperBound
+                                 ? "The available trim target is \(Int(range.lowerBound)) mm. Guides already at that length stay unchanged."
+                                 : "This brief allows a trim target of \(Int(range.lowerBound))–\(Int(range.upperBound)) mm without extending shorter guides.")
+                                .font(.footnote).accessibilityIdentifier("fringeTrimRange")
+                        } else {
+                            Text("No whole-millimeter trim fits the current guide lengths and brief. Adjust preferences for a new design.")
+                                .font(.footnote).accessibilityIdentifier("fringeTrimUnavailable")
+                        }
                         Text("Fringe direction adjustment · \(Int(fringeDirectionDegrees))°").font(.subheadline.weight(.medium))
                         Slider(value:$fringeDirectionDegrees,in:-45...45,step:1)
                             .accessibilityLabel("Fringe direction adjustment in degrees").accessibilityIdentifier("fringeDirectionSlider")
@@ -216,7 +225,9 @@ struct HairLabView: View {
         }.background(Theme.paper).foregroundStyle(Theme.ink).navigationTitle(modelReview ? "Model review" : "Guide studio").navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .task { await store.restore() }
-            .onChange(of: store.snapshot?.hash) { _, _ in fringeMM = min(fringeMM,maximumFringe) }
+            .onChange(of: store.snapshot?.hash) { _, _ in
+                if let target = fringeTrimOptions?.clampedTarget(fringeMM) { fringeMM = target }
+            }
             .navigationDestination(isPresented:$showPreparation) {
                 if let inputs=store.preparationInputs, let source=store.snapshot?.selected {
                     ProcessingLabView(source:source,preparationInputs:inputs,observedFace:store.snapshot?.observedFace,scalpReview:store.snapshot?.scalpReview)

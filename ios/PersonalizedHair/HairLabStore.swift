@@ -214,6 +214,7 @@ final class HairLabStore: ObservableObject {
         if modelReview && ProcessInfo.processInfo.arguments.contains("--refined-model-review-test") { directory = "RefinedModelReviewTest" }
         if modelReview && ProcessInfo.processInfo.arguments.contains("--prepared-pipeline-model-review-test") { directory = "PreparedPipelineModelReviewTest" }
         if modelReview && ProcessInfo.processInfo.arguments.contains("--fresh-short-review-test") { directory = "FreshShortModelReviewTest" }
+        if modelReview && ProcessInfo.processInfo.arguments.contains("--normal-offset-review-test") { directory = "NormalOffsetReviewTest" }
         #endif
         let root=candidate?.directory ?? support.appendingPathComponent(directory)
         worker = HairLabWorker(root:root,modelReview:modelReview,expectedOriginal:candidate?.hash)

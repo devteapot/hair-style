@@ -210,6 +210,20 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
                 input = saved.selected.input; haircut = saved.selected.haircut
                 meshSettings = LiveMeshSettings(radialSides: 6, radiusScale: 30)
             }
+            if ProcessInfo.processInfo.arguments.contains("--normal-offset-review-test") {
+                let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                    .appendingPathComponent("NormalOffsetReviewTest")
+                guard let saved = try await HairLabWorker(root: root, modelReview: true).restore() else {
+                    throw CaptureError.invalid("Save the isolated model-review revision first.")
+                }
+                input = saved.selected.input; haircut = saved.selected.haircut
+                meshSettings = .modelReview
+                let studio = try HairMeshCompiler.compile(input: input, haircut: haircut, radialSides: 3, radiusScale: 8)
+                guard let selected = saved.selectedMesh,
+                      try HairArtifactHash.digest(studio) == HairArtifactHash.digest(selected) else {
+                    throw CaptureError.invalid("Selected studio mesh differs from its saved revision.")
+                }
+            }
             let positions = [(-0.08,-0.08),(0.08,-0.08),(-0.08,0.08),(0.08,0.08),(-0.03,-0.02),(0.04,-0.01),(0.0,0.05)]
             let landmarks = positions.enumerated().map {
                 LiveLandmarkSelection(id: "fixture_\($0.offset)", canonicalPoint: Point3D(x: $0.element.0,y: 0.1,z: $0.element.1), faceVertexIndex: $0.offset)

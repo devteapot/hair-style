@@ -98,6 +98,9 @@ struct HairLabView: View {
                     Text(modelReview ? "Fringe \(range(record.haircut,region:.fringe)) mm · crown \(range(record.haircut,region:.crown)) mm" : "Fringe \(fringeLength(record.haircut)) mm · crown \(crownLength(record.haircut)) mm")
                         .font(.caption.monospacedDigit()).accessibilityIdentifier("hairLengths")
                     Toggle("Compare with original", isOn: $compare).accessibilityIdentifier("compareHairOriginal")
+                    NavigationLink("Compare preview renderers") {
+                        HairRepresentationComparisonView(record:record,observedFace:snapshot.observedFace)
+                    }.accessibilityIdentifier("compareHairRenderers")
                     Text(modelReview ? "Orbit with one finger; pinch to zoom. Gray is the recorded face and amber the inferred scalp. Hair uses the saved material color. Guides are enlarged for inspection." : "Orbit with one finger; pinch to zoom. Colored root dots distinguish the fringe and crown. Hair uses the saved material color.")
                         .font(.footnote).foregroundStyle(Theme.ink.opacity(0.8))
                     HaircutExplanationView(record: record)
@@ -257,8 +260,8 @@ struct HairLabView: View {
     }
 }
 
-/// Enlarged tubes for inspection of the small lab fixture. No density
-/// interpolation, physical material or hair simulation claim.
+/// Prepared render derivatives, or enlarged tubes for the small lab fixture.
+/// No density interpolation or hair simulation claim.
 struct HairGuideScene: UIViewRepresentable {
     let record: StoredHaircut
     let resetCamera: Int
@@ -294,7 +297,8 @@ struct HairGuideScene: UIViewRepresentable {
     }
     func updateUIView(_ view: SCNView, context: Context) {
         let isModel=record.haircut.generation.origin == .model
-        let signature = preparedMesh?.haircutSHA256 ?? (try? HairArtifactHash.digest(record.haircut)) ?? "invalid"
+        let haircutSignature = preparedMesh?.haircutSHA256 ?? (try? HairArtifactHash.digest(record.haircut)) ?? "invalid"
+        let signature = haircutSignature + (preparedMesh.map { ":\($0.method):\($0.radialSides):\($0.radiusScale)" } ?? ":default")
         let segmentSignature=conflictingSegments.prefix(4096).map { "\($0.guideID):\($0.segmentIndex)" }.joined(separator:",")
         let markerSignature = signature + ":" + conflictingRootIDs.sorted().joined(separator: ",") + ":" + segmentSignature
         if context.coordinator.markerSignature != markerSignature {
@@ -363,8 +367,10 @@ struct HairGuideScene: UIViewRepresentable {
                 else if isModel { throw CaptureError.invalid("The model mesh has not finished preparing.") }
                 else { mesh = try HairMeshCompiler.compile(input: record.input, haircut: record.haircut, radiusScale: 30) }
                 context.coordinator.errorLabel.text = nil
+                view.accessibilityValue = "\(mesh.method)|\(mesh.vertices.count)|\(mesh.haircutSHA256)"
             } catch {
                 context.coordinator.errorLabel.text = "Unable to display guides: \(error.localizedDescription)"
+                view.accessibilityValue = "Mesh unavailable"
                 return
             }
             let positions = SCNGeometrySource(vertices: mesh.vertices.map(vector))

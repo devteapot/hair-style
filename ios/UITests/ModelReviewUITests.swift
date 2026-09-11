@@ -1,6 +1,38 @@
 import XCTest
 
 final class ModelReviewUITests:XCTestCase {
+    func testPersonalCandidateRendererComparisonPreservesSelection() throws {
+        // Requires a private package in Documents/normal-offset-review-test.json.
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchArguments=["--normal-offset-review-test"];open(app)
+        let load=app.buttons["loadPreparedModelReview"]
+        let delete=app.buttons["deleteHairFixture"]
+        let restored=XCTNSPredicateExpectation(predicate:NSPredicate { _,_ in
+            (load.exists && load.isEnabled) || (delete.exists && delete.isEnabled)
+        },object:app)
+        wait(for:[restored],timeout:90)
+        if delete.exists {
+            reveal(delete,app);delete.tap();app.alerts.buttons["Delete"].tap()
+        }
+        let loadReady=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == true AND enabled == true"),object:load)
+        wait(for:[loadReady],timeout:30);reveal(load,app);load.tap()
+        status("Saved · revision 1",app)
+        let selected=app.staticTexts["selectedHairHash"].label
+        let link=app.buttons["compareHairRenderers"];reveal(link,app);link.tap()
+        let scene=app.otherElements["hairRendererComparisonScene"]
+        XCTAssertTrue(scene.waitForExistence(timeout:90))
+        let tube=scene.value as? String ?? ""
+        XCTAssertTrue(tube.hasPrefix("guide_tube_mesh_v1|230426|"))
+        let tubeImage=XCTAttachment(screenshot:app.screenshot());tubeImage.name="Personal tubes";tubeImage.lifetime = .keepAlways;add(tubeImage)
+        app.segmentedControls["hairRendererPicker"].buttons["Ribbons"].tap()
+        let ribbonReady=XCTNSPredicateExpectation(predicate:NSPredicate(format:"value BEGINSWITH %@","guide_ribbon_mesh_v1|152600|"),object:scene)
+        wait(for:[ribbonReady],timeout:20)
+        XCTAssertEqual(tube.split(separator:"|").last,(scene.value as? String ?? "").split(separator:"|").last)
+        let ribbonImage=XCTAttachment(screenshot:app.screenshot());ribbonImage.name="Personal ribbons";ribbonImage.lifetime = .keepAlways;add(ribbonImage)
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertEqual(app.staticTexts["selectedHairHash"].label,selected)
+        status("Saved · revision 1",app)
+    }
     func testInferredOffsetCandidateTrimsAtBriefMinimumAndReachesLiveInspection() throws {
         // Requires the private face-clear package in Documents/normal-offset-review-test.json.
         // Tracker landmarks remain synthetic; no camera or physical alignment is tested.

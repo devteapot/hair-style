@@ -1,6 +1,28 @@
 import XCTest
 
 final class HairLabUITests: XCTestCase {
+    func testRendererComparisonUpdatesGeometryWithoutChangingRevision() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launch();openLab(app)
+        if app.buttons["createHairFixture"].exists { app.buttons["createHairFixture"].tap() }
+        let link=app.buttons["compareHairRenderers"];reveal(link,in:app);link.tap()
+        let scene=app.otherElements["hairRendererComparisonScene"]
+        XCTAssertTrue(scene.waitForExistence(timeout:30))
+        let tube=scene.value as? String ?? ""
+        XCTAssertTrue(tube.hasPrefix("guide_tube_mesh_v1|"))
+        let revision=app.staticTexts["hairRendererRevision"].label
+        app.segmentedControls["hairRendererPicker"].buttons["Ribbons"].tap()
+        let ribbonReady=XCTNSPredicateExpectation(predicate:NSPredicate(format:"value BEGINSWITH %@","guide_ribbon_mesh_v1|"),object:scene)
+        wait(for:[ribbonReady],timeout:10)
+        let ribbon=scene.value as? String ?? ""
+        XCTAssertNotEqual(tube,ribbon)
+        XCTAssertEqual(tube.split(separator:"|").last,ribbon.split(separator:"|").last)
+        XCTAssertEqual(app.staticTexts["hairRendererRevision"].label,revision)
+        let image=XCTAttachment(screenshot:app.screenshot());image.name="Ribbon renderer comparison";image.lifetime = .keepAlways;add(image)
+        app.segmentedControls["hairRendererPicker"].buttons["Tubes"].tap()
+        let tubeReady=XCTNSPredicateExpectation(predicate:NSPredicate(format:"value == %@",tube),object:scene)
+        wait(for:[tubeReady],timeout:10)
+    }
     func testPreferenceRowsScaleAtAccessibilitySize() throws {
         continueAfterFailure=false
         let app=XCUIApplication()

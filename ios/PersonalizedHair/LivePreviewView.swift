@@ -26,6 +26,11 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
     private var lastFrameTimestamp: Double?
     private var timingRecorder: LiveTimingRecorder?
     private var timingReport: LiveTimingReport?
+    private var renderTimingDelegate: LiveRenderTimingDelegate?
+    @Published var renderingSummary = ""
+    #if targetEnvironment(simulator)
+    private var simulatorRenderSettings: (Bool, Bool)?
+    #endif
     @Published var hasTimingReport = false
     @Published var timingExportURL: URL?
     @Published var exportingTiming = false
@@ -161,8 +166,15 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
         guard permitted else { error = "Camera access is off. Enable it in Settings to try the live preview."; return }
         sessionID = UUID().uuidString; tracker = nil; lastFrameTimestamp = nil; lastFaceAnchorID = nil
         let configuration = ARFaceTrackingConfiguration(); configuration.maximumNumberOfTrackedFaces = ARFaceTrackingConfiguration.supportedNumberOfTrackedFaces
+        if let package {
+            let identity = try? HairArtifactHash.digest(package.haircut)
+            if let identity {
+                timingRecorder = try? LiveTimingRecorder(haircutSHA256: identity)
+                renderTimingDelegate = try? LiveRenderTimingDelegate(haircutSHA256: identity)
+                view.delegate = renderTimingDelegate
+            }
+        }
         view.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
-        if let package { timingRecorder = try? LiveTimingRecorder(haircutSHA256: HairArtifactHash.digest(package.haircut)) }
         timingReport = nil; hasTimingReport = false
         if let timingExportURL { try? FileManager.default.removeItem(at: timingExportURL) }
         timingExportURL = nil
@@ -172,6 +184,23 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
     }
 
     #if targetEnvironment(simulator)
+    func recordSimulatorRenderTiming() async {
+        guard ready, !running, let package else { return }
+        do {
+            let identity = try HairArtifactHash.digest(package.haircut)
+            timingRecorder = try LiveTimingRecorder(haircutSHA256: identity)
+            renderTimingDelegate = try LiveRenderTimingDelegate(haircutSHA256: identity, context: .syntheticInspection)
+            simulatorRenderSettings = (inspectionView.isPlaying, inspectionView.rendersContinuously)
+            inspectionView.delegate = renderTimingDelegate
+            inspectionView.isPlaying = true; inspectionView.rendersContinuously = true
+            timingReport = nil; hasTimingReport = false; renderingSummary = ""
+            running = true; let ticket = requestID
+            try await Task.sleep(nanoseconds: 3_000_000_000)
+            guard ticket == requestID else { return }
+            stop()
+        } catch { stop(); self.error = error.localizedDescription }
+    }
+
     func loadSimulatorFixture() async {
         do {
             let (input, original) = try SyntheticHaircut.create()
@@ -293,8 +322,23 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
     }
 
     func stop() {
+        let renderReport = renderTimingDelegate?.stop()
+        view.delegate = nil; renderTimingDelegate = nil
+        #if targetEnvironment(simulator)
+        if let settings = simulatorRenderSettings {
+            inspectionView.delegate = nil
+            inspectionView.isPlaying = settings.0; inspectionView.rendersContinuously = settings.1
+            simulatorRenderSettings = nil
+        }
+        #endif
         if let timingRecorder {
-            timingReport = timingRecorder.report(); hasTimingReport = !(timingReport?.samples.isEmpty ?? true)
+            var report = timingRecorder.report(); report.rendererCallbacks = renderReport
+            timingReport = report
+            hasTimingReport = !report.samples.isEmpty || (renderReport?.observedCallbackCount ?? 0) > 0
+            if let renderReport {
+                let prefix = renderReport.context == .syntheticInspection ? "Synthetic renderer callbacks" : "Renderer callbacks"
+                renderingSummary = "\(prefix): \(renderReport.observedCallbackCount)"
+            }
             self.timingRecorder = nil
         }
         requestID = UUID(); preparing = false; running = false
@@ -346,6 +390,10 @@ struct LivePreviewView: View {
                 #if targetEnvironment(simulator)
                 Button("Load synthetic preview test") { Task { await model.loadSimulatorFixture() } }
                     .disabled(model.preparing).accessibilityIdentifier("loadPreviewFixture")
+                if model.ready && ProcessInfo.processInfo.arguments.contains("--render-timing-test") {
+                    Button("Record synthetic rendering timing") { Task { await model.recordSimulatorRenderTiming() } }
+                        .disabled(model.running).accessibilityIdentifier("recordSyntheticRenderTiming")
+                }
                 #endif
                 if model.ready {
                     HairInspectionSurface(model: model).frame(height: 320)
@@ -366,7 +414,8 @@ struct LivePreviewView: View {
                         .accessibilityIdentifier("liveUnsupported")
                 }
                 if model.hasTimingReport && !model.running {
-                    Text("Timing report records display intervals, camera-frame arrivals, tracking state and thermal state. It contains no images or face coordinates. Display intervals do not measure GPU render time.")
+                    Text(model.renderingSummary).accessibilityIdentifier("renderTimingSummary")
+                    Text("Timing records display intervals, SceneKit render callbacks, camera-frame arrivals, tracking and thermal state. It contains no images or face coordinates. These callbacks do not measure GPU completion or displayed-frame timing.")
                         .font(.footnote)
                     Button("Prepare timing export") { Task { await model.exportTiming() } }
                         .disabled(model.exportingTiming)

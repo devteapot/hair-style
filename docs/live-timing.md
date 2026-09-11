@@ -1,5 +1,34 @@
 # Live preview timing instrumentation
 
+The report now also includes optional `rendererCallbacks` from SceneKit's
+`didRenderScene` callback. Each camera run owns a separate locked recorder;
+stopping detaches its delegate and ignores any later callbacks. The renderer
+trace is bound to the same haircut hash as the display-link report. Older
+display-link-only exports still decode without this optional field.
+
+Renderer telemetry records callback intervals and normalized thermal states,
+with a default limit of 36,000 retained intervals. Callback count, thermal
+counts, long-interval count, and observation duration continue across overflow;
+median and p95 fields explicitly describe retained samples. The mean callback
+rate is an event rate, not achieved display FPS. GPU completion, presentation,
+and sustained-performance verification remain false.
+
+The simulator-only `--render-timing-test` path renders a synthetic inspection
+scene without requesting camera access. Its report carries the explicit
+`synthetic_inspection` context; normal live runs use `live_camera`. This avoids
+mistaking synthetic callback evidence for physical camera performance.
+
+Validation: 153 core tests pass, including invalid timestamps, bounded retention,
+complete overflow counters, and old/new export round trips. The unsigned iPhone
+build passes. A native simulator UI test recorded 180 callbacks over 2.983
+seconds and prepared the actual JSON export. Independent inspection confirms
+179 positive intervals, matching haircut identities, correct event/count
+arithmetic, zero camera frames, and explicit unverified performance status.
+Local artifacts are under `outputs/native-render-timing/`. A five-minute
+physical run, GPU/presentation measurements, thermal behavior, and the minimum
+device performance gate remain unverified. No phone install or camera activation
+was performed for this change.
+
 The native live preview records a bounded display-link trace from camera start to stop. After stopping, choose **Prepare timing export**, then **Share timing report**. Preparing the JSON file is local and does not transmit anything. Exports use protected temporary files; a subsequent export or camera run removes the previous export file held by that screen. Shared copies are outside the app's control. The report is not a persisted capture artifact and is not restored after relaunch.
 
 The report binds to the exact haircut hash and records:

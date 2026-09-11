@@ -4,6 +4,8 @@ Updated: 2026-09-11. The full objective remains the implementation plan, M0 thro
 
 ## Implemented and verified
 
+- Added SceneKit callback and thermal telemetry alongside existing display-link traces, with bounded retention, separate per-run delegates, and explicit synthetic/live contexts. All 153 core tests, the iPhone build, and a native simulator callback/export test pass. The actual JSON contains 180 callbacks and zero camera frames; physical sustained rendering performance remains unverified. See [live timing](live-timing.md).
+
 - Added continuous fixed-root rotation experiments that preserve curve shape and length. Four new rotation tests and all 13 related numerical tests pass. All 42 real candidates retain roots/length bounds and stay within 14.144 mm of the original decode, but none clears the face. No candidate or default pipeline changes. See [continuous rotation](face-distance-fitting.md#continuous-rotation-with-length-preserved).
 
 - Added an opt-in local departure-plane decoder objective and four numerical tests. The actual guide-632 run preserves its root and movement bound but violates minimum length; independent replay and canonical validation reject it. The normal conditioning runner and studio candidate are unchanged. See [departure-plane experiment](face-distance-fitting.md#experimental-local-departure-planes).

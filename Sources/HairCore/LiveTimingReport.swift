@@ -22,6 +22,8 @@ public struct LiveTimingReport: Codable, Sendable {
     public var intervalsOver40ms: Int
     public var newCameraFrameCount: Int
     public var sustainedPerformanceVerified = false
+    /// Optional for compatibility with earlier display-link-only exports.
+    public var rendererCallbacks: RenderTimingReport? = nil
 }
 
 public struct LiveTimingRecorder: Sendable {

@@ -257,3 +257,11 @@ as a fitting objective. It never automatically accepts a haircut or registration
 .research/metal-env/bin/python -m unittest discover -s tools \
   -p test_compare_hair_image.py
 ```
+
+The color-edit UI test also opens the saved synthetic revision in the live
+inspection viewer and checks revision 2 and its selected hash without starting
+a camera. A core round-trip test compares the entire compiled studio/live mesh,
+including materials and source report provenance. All 160 core tests, the
+extended simulator flow and the device build pass. The inspected live screenshot
+confirms the test scene renders; physical alignment and photometric fidelity are
+not established by this fixture.

@@ -27,7 +27,18 @@ final class RecordedColorUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Saved · revision 1"].waitForExistence(timeout: 10))
         let redo = app.buttons["redoHairRevision"]; reveal(redo); redo.tap()
         XCTAssertTrue(saved.waitForExistence(timeout: 10))
+        let savedHash = app.staticTexts["selectedHairHash"].label
+        XCTAssertEqual(savedHash.count, 10)
         for _ in 0..<5 { app.swipeDown() }
         let image = XCTAttachment(screenshot: app.screenshot()); image.name = "Saved recorded-color revision"; image.lifetime = .keepAlways; add(image)
+        app.navigationBars.buttons.firstMatch.tap()
+        let live = app.buttons["openLiveLab"]; reveal(live); live.tap()
+        app.buttons["loadPreviewFixture"].tap()
+        let identity = app.staticTexts["importedHairIdentity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 15))
+        XCTAssertTrue(identity.label.contains("Revision 2"))
+        XCTAssertTrue(identity.label.contains(savedHash))
+        XCTAssertFalse(app.buttons["Start camera"].exists)
+        let liveImage = XCTAttachment(screenshot: app.screenshot()); liveImage.name = "Same color revision in live inspection"; liveImage.lifetime = .keepAlways; add(liveImage)
     }
 }

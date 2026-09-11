@@ -197,14 +197,26 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
 
     func loadSimulatorFixture() async {
         do {
-            let (input, original) = try SyntheticHaircut.create()
+            let (fixtureInput, original) = try SyntheticHaircut.create()
+            var input = fixtureInput
             var haircut = original; haircut.materials[0].radiusMeters = 0.0015
+            var meshSettings: LiveMeshSettings?
+            if ProcessInfo.processInfo.arguments.contains("--recorded-color-test") {
+                let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                    .appendingPathComponent("RecordedColorStudioTest")
+                guard let saved = try await HairLabWorker(root: root).restore() else {
+                    throw CaptureError.invalid("Create and save the synthetic recorded-color revision first.")
+                }
+                input = saved.selected.input; haircut = saved.selected.haircut
+                meshSettings = LiveMeshSettings(radialSides: 6, radiusScale: 30)
+            }
             let positions = [(-0.08,-0.08),(0.08,-0.08),(-0.08,0.08),(0.08,0.08),(-0.03,-0.02),(0.04,-0.01),(0.0,0.05)]
             let landmarks = positions.enumerated().map {
                 LiveLandmarkSelection(id: "fixture_\($0.offset)", canonicalPoint: Point3D(x: $0.element.0,y: 0.1,z: $0.element.1), faceVertexIndex: $0.offset)
             }
-            let fixture = LivePreviewPackage(input: input, haircut: haircut,
+            var fixture = LivePreviewPackage(input: input, haircut: haircut,
                 fitLandmarks: Array(landmarks.prefix(4)), validationLandmarks: Array(landmarks.suffix(3)))
+            fixture.meshSettings = meshSettings
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
             try ManifestCoding.encoder().encode(fixture).write(to: url, options: .atomic)
             defer { try? FileManager.default.removeItem(at: url) }

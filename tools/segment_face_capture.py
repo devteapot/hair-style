@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Local research face parsing -> explicit observed-surface mask.
+"""Local research parsing -> face surface mask or image-space hair evidence.
 
 Uses pinned SegFormer weights; no camera evidence is sent to a service. Outputs
-are model-inferred masks, not measured skin labels or accepted head geometry.
+are model-inferred masks, not measured labels or accepted head/hair geometry.
 """
 import argparse
 import hashlib
@@ -58,6 +58,8 @@ def main():
     parser.add_argument('--device', choices=['cpu', 'mps'], default='mps')
     parser.add_argument('--compare-cpu', action='store_true')
     parser.add_argument('--confidence', type=float, default=0.8)
+    parser.add_argument('--target', choices=['face', 'hair'], default='face')
+    parser.add_argument('--capture-condition', choices=['tied', 'untied', 'unknown'], default='unknown')
     args = parser.parse_args()
     if not 0.5 <= args.confidence <= 0.99:
         raise ValueError('Use an explicit confidence threshold between 0.5 and 0.99')
@@ -72,9 +74,9 @@ def main():
     metadata = frame['metadata']
     if metadata['mirrored'] or metadata['pixelOrientation'] != 'sensor_native':
         raise ValueError('Requires native unmirrored input')
-    if abs(metadata['imageTimestamp'] - metadata['depthTimestamp']) > .01:
+    if args.target == 'face' and abs(metadata['imageTimestamp'] - metadata['depthTimestamp']) > .01:
         raise ValueError('Image/depth timestamps exceed the existing 10 ms gate')
-    if metadata['depthRectification'] not in ('not_applied', 'arkit_aligned_scene_depth'):
+    if args.target == 'face' and metadata['depthRectification'] not in ('not_applied', 'arkit_aligned_scene_depth'):
         raise ValueError('Unsupported image/depth alignment')
     image_path, image_data = verify_payload(bundle, frame['image'])
     _, depth_data = verify_payload(bundle, frame['depth'])
@@ -116,7 +118,7 @@ def main():
             labels = probabilities.argmax(dim=1)
             # Skin/nose/lips are all retained. Their mutual class boundaries
             # must not become holes merely because no single class exceeds .8.
-            probs = probabilities[:, INCLUDED_LABELS].sum(dim=1)
+            probs = probabilities[:, [13] if args.target == 'hair' else INCLUDED_LABELS].sum(dim=1)
             if device == 'mps': torch.mps.synchronize()
         timings[device] = time.perf_counter()-start
         return labels[0].cpu().numpy().astype(np.uint8), probs[0].cpu().numpy().astype(np.float32)
@@ -133,6 +135,48 @@ def main():
     # Invert the explicit quarter-turn before mapping to aligned depth pixels.
     labels = np.rot90(labels, -ROTATIONS[args.rotation]).copy()
     confidence = np.rot90(confidence, -ROTATIONS[args.rotation]).copy()
+    if args.target == 'hair':
+        # Retain full RGB resolution; this artifact does not register or fuse depth.
+        from hair_image_observations import observe_hair
+        mask, interior, observation = observe_hair(native, labels, confidence, args.confidence)
+        args.output.mkdir(parents=True, exist_ok=False)
+        labels_data, confidence_data = labels.tobytes(), confidence.astype('<f4').tobytes()
+        (args.output/'labels.u8').write_bytes(labels_data)
+        (args.output/'hair-posterior.f32').write_bytes(confidence_data)
+        mask_data = mask.astype(np.uint8).tobytes()
+        (args.output/'hair-mask.u8').write_bytes(mask_data)
+        interior_data = interior.astype(np.uint8).tobytes()
+        (args.output/'hair-interior.u8').write_bytes(interior_data)
+        report = {'schemaVersion': 1, 'method': 'local_segformer_hair_image_v1',
+                  'captureID': manifest['id'], 'frameID': metadata['id'], 'frameIndex': args.frame_index,
+                  'sourceManifestSHA256': digest(manifest_data), 'imageSHA256': digest(image_data),
+                  'depthSHA256': digest(depth_data), 'model': download,
+                  'imageSize': metadata['imageSize'], 'coordinateConvention': 'native_image_x_right_y_down_pixels',
+                  'rotationToUpright': args.rotation, 'confidenceThreshold': args.confidence,
+                  'confidenceMode': 'hair_class_posterior', 'device': args.device,
+                  'timingsSeconds': timings, 'cpuAgreement': agreement,
+                  'captureCondition': args.capture_condition,
+                  'captureConditionSource': 'operator_assertion' if args.capture_condition != 'unknown' else 'unknown',
+                  'labelsSHA256': digest(labels_data), 'posteriorSHA256': digest(confidence_data),
+                  'maskSHA256': digest(mask_data), 'interiorMaskSHA256': digest(interior_data),
+                  'observation': observation, 'acceptedForNaturalHairBaseline': False,
+                  'registeredToHead': False, 'commercialUseCleared': False,
+                  'notes': ['Research/educational model only per author card.',
+                      'Model posterior is not calibrated accuracy. Review segmentation before use.',
+                      'Recorded color includes lighting and camera processing; it is not intrinsic hair color.',
+                      'No metric hair volume, scalp completion, root direction or follicle density is inferred.',
+                      'Tied and unknown-condition captures cannot establish the natural-hair silhouette.']}
+        (args.output/'report.json').write_text(json.dumps(report, indent=2)+'\n')
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        fig, axes = plt.subplots(1, 3, figsize=(12, 5))
+        for ax, data, title in zip(axes, [native, mask, interior],
+                ['Recorded RGB', 'Inferred hair; review required', 'Interior for recorded color']):
+            ax.imshow(np.rot90(data, ROTATIONS[args.rotation])); ax.set_title(title); ax.axis('off')
+        fig.tight_layout(); fig.savefig(args.output/'diagnostic.png', dpi=140); plt.close(fig)
+        print(json.dumps(observation, indent=2))
+        return
     if labels.shape != depth.shape:
         # Nearest image pixel at each depth pixel center. No label interpolation.
         yy = np.minimum(((np.arange(h)+.5)*labels.shape[0]/h).astype(int), labels.shape[0]-1)

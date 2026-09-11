@@ -1,6 +1,8 @@
 # Scan-derived hair appearance
 
-Status: design extension; extraction, fitting and viewer integration remain open.
+Status: image-space hair-mask and recorded-color extraction implemented as a
+local research command; natural-hair validation, 3D fitting and viewer integration
+remain open.
 
 The untied-hair capture supplies a personal appearance baseline for both the
 current-hair reconstruction and the proposed haircut. Keep these as separate
@@ -64,3 +66,44 @@ itself supply editable haircut strands or hidden-root measurements.
   do not establish realism, frame rate or physical haircut feasibility.
 
 Capture images, masks, derived personal models and review renders remain private.
+
+## Local image-evidence command
+
+With the existing pinned face-parsing model and local research environment:
+
+```sh
+.research/metal-env/bin/python tools/segment_face_capture.py \
+  CAPTURE_BUNDLE FRAME_INDEX PRIVATE_OUTPUT_DIRECTORY \
+  --target hair --capture-condition untied --rotation clockwise90 --compare-cpu
+```
+
+Choose rotation from the recorded image; `clockwise90` is an example, not a
+universal sensor rule. The condition is an operator assertion, not an automatic
+classifier. Use `tied` for diagnostic processing of pinned hair, or `unknown`
+when preparation has not been confirmed. No output is automatically accepted
+as a natural-hair baseline, even when `untied` is asserted.
+
+The command verifies the capture and pinned local weights, preserves full native
+RGB resolution, and writes class labels, hair posterior, binary hair mask, an
+eroded interior mask, a diagnostic plot and a provenance report. Recorded color
+percentiles use interior pixels to reduce boundary mixing; fewer than 100
+interior pixels yields unknown color. A two-pixel erosion does not guarantee
+removal of segmentation errors. The report keeps lighting-dependent recorded
+color distinct from calibrated intrinsic color and leaves roots, density, scalp
+shape and metric volume unknown. This RGB-only branch does not require depth
+synchronization and produces no fused surface.
+
+An existing tied-hair rear frame was processed locally on CPU and MPS: class
+labels agreed on all pixels and hair posteriors differed by at most 2.1e-6.
+The diagnostic mask was visually inspected; this checks plumbing and basic
+plausibility, not segmentation accuracy or untied-hair quality. Four synthetic
+tests cover boundary-color exclusion, native coordinate bounds, low-confidence
+and nonhair rejection, image-edge erosion and invalid arrays:
+
+```sh
+.research/metal-env/bin/python -m unittest discover -s tools \
+  -p test_hair_image_observations.py
+```
+
+The reused model remains research-only under the recorded model-card terms;
+commercial use is not cleared by this implementation.

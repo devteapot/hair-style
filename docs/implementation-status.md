@@ -4,6 +4,8 @@ Updated: 2026-09-11. The full objective remains the implementation plan, M0 thro
 
 ## Implemented and verified
 
+- Added native per-frame hair-analysis report import, persistent review summaries and exact capture/image binding. All 158 core tests and the iOS build pass; the shared Swift validator accepts the existing local tied-frame report. The native file-picker interaction is not yet UI-verified. Recent local tools extract hair masks, recorded color and undirected image texture axes, and compare projected guides with optional depth occlusion (14 Python tests). Capture preparation declarations now persist from the capture screen. No untied capture, accepted appearance profile or appearance-driven 3D fit is established. See [scan-derived hair](scan-derived-hair.md).
+
 - Added SceneKit callback and thermal telemetry alongside existing display-link traces, with bounded retention, separate per-run delegates, and explicit synthetic/live contexts. All 153 core tests, the iPhone build, and a native simulator callback/export test pass. The actual JSON contains 180 callbacks and zero camera frames; physical sustained rendering performance remains unverified. See [live timing](live-timing.md).
 
 - Added continuous fixed-root rotation experiments that preserve curve shape and length. Four new rotation tests and all 13 related numerical tests pass. All 42 real candidates retain roots/length bounds and stay within 14.144 mm of the original decode, but none clears the face. No candidate or default pipeline changes. See [continuous rotation](face-distance-fitting.md#continuous-rotation-with-length-preserved).

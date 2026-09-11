@@ -1,6 +1,7 @@
 import SwiftUI
 import SceneKit
 import HairCore
+import UniformTypeIdentifiers
 
 struct PassReviewView: View {
     let pass: SavedPass
@@ -28,6 +29,9 @@ struct PassReviewView: View {
     @State private var detectingFace = false
     @State private var landmarkError: String?
     @State private var landmarkTicket = UUID()
+    @State private var hairAnalysis: HairImageAnalysis?
+    @State private var importHairAnalysis = false
+    @State private var hairAnalysisError: String?
 
     private var frame: StoredFrame? {
         pass.manifest.frames.indices.contains(Int(index)) ? pass.manifest.frames[Int(index)] : nil
@@ -111,6 +115,29 @@ struct PassReviewView: View {
                         metric("Mirrored data", frame.metadata.mirrored ? "Yes" : "No")
                     }.font(.caption)
                 }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Hair evidence").font(.headline)
+                    Text("Recorded preparation: \(pass.manifest.declaredHairCondition?.rawValue ?? "unknown")")
+                    if let hairAnalysis {
+                        Text("Inferred hair: \(hairAnalysis.observation.hairPixels) image pixels")
+                        if let color = hairAnalysis.observation.recordedColor {
+                            HStack {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color(.sRGB, red: color.median[0]/255, green: color.median[1]/255, blue: color.median[2]/255))
+                                    .frame(width: 36, height: 24)
+                                Text("Recorded color estimate · affected by lighting")
+                            }
+                        }
+                        if let axes = hairAnalysis.textureOrientation {
+                            Text("Texture orientation supported at \(axes.supportedPixels) pixels; growth direction unknown.")
+                        }
+                        Text("Image analysis is unvalidated and has not been accepted into your hair profile.")
+                    }
+                    Button("Import hair analysis for this frame") { importHairAnalysis = true }
+                        .disabled(frame == nil || report?.valid != true || loading)
+                        .accessibilityIdentifier("importHairAnalysis")
+                    if let hairAnalysisError { Text(hairAnalysisError).foregroundStyle(.red) }
+                }.font(.footnote).foregroundStyle(Theme.ink)
                 if let timing {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Saved frame timing").font(.headline)
@@ -171,6 +198,18 @@ struct PassReviewView: View {
             .task(id: Int(index)) { await loadFrame() }
             .onChange(of: rotation) { _, _ in clearLandmarks() }
             .onDisappear { clearLandmarks(); cancelExport() }
+            .fileImporter(isPresented: $importHairAnalysis, allowedContentTypes: [.json]) { result in
+                do {
+                    let url = try result.get()
+                    let access = url.startAccessingSecurityScopedResource()
+                    defer { if access { url.stopAccessingSecurityScopedResource() } }
+                    guard let selected = frame else { return }
+                    let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
+                    guard size <= 1_048_576 else { throw CaptureError.invalid("Hair analysis file is too large.") }
+                    hairAnalysis = try HairImageAnalysis.save(Data(contentsOf: url), bundle: pass.url, frameID: selected.metadata.id)
+                    hairAnalysisError = nil
+                } catch { hairAnalysisError = error.localizedDescription }
+            }
             .sheet(item: $share, onDismiss: cleanupExport) { file in ShareSheet(url: file.url) }
             .alert("Delete this capture?", isPresented: $confirmDelete) {
                 Button("Delete", role: .destructive) { cancelExport(); if store.delete(pass) { dismiss() } else { error = store.error } }
@@ -184,6 +223,7 @@ struct PassReviewView: View {
 
     private func loadFrame() async {
         clearLandmarks()
+        hairAnalysis = nil; hairAnalysisError = nil
         guard let selected = frame else { loading = false; return }
         loading = true
         do {
@@ -199,6 +239,8 @@ struct PassReviewView: View {
             }.value
             try Task.checkCancellation()
             imageData = result.0; points = result.1; loading = false
+            do { hairAnalysis = try HairImageAnalysis.load(bundle: pass.url, frameID: selected.metadata.id) }
+            catch { hairAnalysisError = error.localizedDescription }
         } catch is CancellationError { }
         catch { self.error = error.localizedDescription; loading = false }
     }

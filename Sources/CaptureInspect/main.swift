@@ -84,6 +84,15 @@ func run() throws {
         let package=try result.modelReviewPackage(scalpReview:scalp)
         try ManifestCoding.encoder().encode(package).write(to:output,options:.atomic)
         print("Created exact candidate review handoff. Physical/style acceptance remains false.")
+    case "hair-image-review":
+        guard args.count == 4 else { throw CaptureError.invalid("hair-image-review requires CAPTURE_BUNDLE FRAME_ID REPORT.json.") }
+        let reportURL = URL(fileURLWithPath: args[3])
+        guard let size = try reportURL.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 1_048_576 else {
+            throw CaptureError.invalid("Hair analysis file is too large.")
+        }
+        let value = try HairImageAnalysis.validated(Data(contentsOf: reportURL),
+            bundle: URL(fileURLWithPath: args[1]), frameID: args[2])
+        print("Validated review-only image report: \(value.observation.hairPixels) hair pixels. Profile acceptance remains false.")
     case "hair-mesh":
         guard (4...6).contains(args.count) else { throw CaptureError.invalid("hair-mesh requires INPUT.json HAIRCUT.json OUTPUT.json [RADIAL_SIDES] [DIAGNOSTIC_RADIUS_SCALE].") }
         let input = try ManifestCoding.decoder().decode(HairDesignInput.self, from: Data(contentsOf: URL(fileURLWithPath: args[1])))

@@ -67,6 +67,32 @@ itself supply editable haircut strands or hidden-root measurements.
 
 Capture images, masks, derived personal models and review renders remain private.
 
+## Native review of image evidence
+
+In a saved capture's review screen, select the source frame and choose “Import
+hair analysis for this frame” to import the local command's `report.json`.
+The app checks the exact manifest hash, capture/frame identity, image hash and
+payload, dimensions, preparation provenance and review-only claims. It displays
+recorded color and texture-support counts; it does not import mask rasters or
+claim that the segmentation has been visually verified inside the app.
+
+The report is saved under the capture's `analysis/hair` folder with iOS complete
+file protection and revalidated when the frame is reopened. Capture deletion
+removes that folder too. The existing capture ZIP exports raw evidence only;
+derived reports are not included. A revised manifest invalidates the report
+binding instead of silently carrying it forward. Import does not alter the
+personal hair profile, generate guides or change either preview's haircut.
+
+Core tests cover persistence, unchanged capture integrity, wrong-frame rejection,
+invalid color/measurement claims, preparation provenance and stale manifests.
+The iOS build passes; native file-picker interaction still needs device or
+simulator UI verification.
+
+The same validator is available as `capture-inspect hair-image-review
+CAPTURE_BUNDLE FRAME_ID REPORT.json`. It successfully checked the existing
+local tied-frame report (459,683 inferred hair pixels); this verifies contract
+compatibility and source binding, not physical analysis accuracy.
+
 ## Local image-evidence command
 
 With the existing pinned face-parsing model and local research environment:

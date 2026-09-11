@@ -139,3 +139,10 @@ not a usable or physically validated haircut, and no app selection is replaced.
 Outputs are private under `outputs/local-root-bending*`. Repeating this local
 unsigned-distance optimization is not justified without a new constraint or
 better anatomical evidence.
+
+Subsequent root-side trials at larger bend caps exposed a likely local conflict
+between the inferred scalp and observed face. An explicit inferred attachment
+offset experiment clears the supplied face while preserving the original curve
+shapes; see [normal root offsets](normal-root-offsets.md). This supersedes the
+remaining-collision count as the best research result, but does not validate the
+head estimate or actual hair-growth locations.

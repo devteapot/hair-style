@@ -4,6 +4,8 @@ Updated: 2026-09-11. The full objective remains the implementation plan, M0 thro
 
 ## Implemented and verified
 
+- A bounded inferred root-offset experiment clears all 68 remaining segment conflicts against the supplied face. Six attachments move outward by 2.25–3.25 mm; 757 other guides are unchanged, shapes/lengths are preserved and all existing cumulative movement limits pass. Three new tests, independent geometry/attachment checks and the self-contained native review-package replay pass; comparative renders were inspected. These are inferred offsets bridging a possible scalp/face mismatch, not measured roots. Missing ears, head accuracy and physical fit remain unresolved; no native selection was changed. See [normal root offsets](normal-root-offsets.md).
+
 - Tested local root bending with every segment length preserved. Fifteen root-related and five distance tests pass; 72 actual bounded candidates still collide. A combined research copy reduces exact segment conflicts from 68 to 47, retains zero root violations and leaves 757 other guides unchanged. Larger bend caps do not clear the six remaining guides. No app selection changes or physical fit claim. See [local bending](face-distance-fitting.md#local-bending-with-segment-lengths-preserved).
 
 - Added an optional per-frame image-detail diagnostic shared by all capture paths, displayed in frame review, and an integrity-checked offline JPEG inspection command. All 163 core tests and the iOS build pass; an existing participant frame was processed locally. It has no calibrated blur/acceptance threshold and does not reject captures. Device runtime overhead remains unmeasured. See [image detail](image-detail-diagnostic.md).

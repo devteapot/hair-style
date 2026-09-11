@@ -4,6 +4,8 @@ Updated: 2026-09-11. The full objective remains the implementation plan, M0 thro
 
 ## Implemented and verified
 
+- Localized all 68 remaining collision records to the first 7.68 mm of their curves and to the largest face-mesh component. Detached surface fragments do not explain the failures. The new diagnostic replays canonical clearance and passes four topology tests; no geometry or collision gate changed. See [collision localization](face-distance-fitting.md#collision-localization-on-the-observed-surface).
+
 - Audited actual decoder root frames with source-root replay, exact clearance replay, and inverse-transpose/cross-product normal agreement. Three numerical tests pass. Conflicting guides do not show unusually large normal mismatch; aligning their normals still leaves conflicts on all six. No candidate is promoted. See [template-frame audit](face-distance-fitting.md#actual-template-frame-audit).
 
 - Completed the regional latent-neighbor search for all six unresolved guides: 768 shapes explored, 666 eligible exact checks, no clear candidate. Independent serialized-geometry replay confirms unchanged roots, valid regional lengths, and maximum movement 13.161 mm. Single-guide candidate construction reduces the repeat guide-632 check stage from 24.51 to 7.19 seconds with identical decisions. The original research/studio candidates remain unchanged. See [six-guide sweep](face-distance-fitting.md#all-six-unresolved-guides).

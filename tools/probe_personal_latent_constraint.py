@@ -41,13 +41,9 @@ def main():
     latent0=texture.permute(2,3,0,1)[h.nonzerox,h.nonzeroy].permute(1,0,2).reshape(-1,64)[indices].clone()
     for parameter in h.dec.parameters():parameter.requires_grad_(False)
     def xyz(value):return torch.tensor([value['x'],value['y'],value['z']],dtype=torch.float32)
-    vertices=torch.stack([xyz(p) for p in inp['scalp']['vertices']])
-    targets=[]
-    for i in indices:
-        binding=mapping['mappings'][i]['binding']
-        targets.append(torch.tensor(binding['barycentric'])@vertices[inp['scalp']['triangles'][binding['triangleIndex']]])
-        if binding['normalOffsetMeters']!=0:raise ValueError('Probe requires zero normal-offset attachment')
-    target=torch.stack(targets)[:,None]
+    from scalp_attachments import attachment_positions
+    roots=attachment_positions(inp['scalp'],[mapping['mappings'][i]['binding'] for i in indices])
+    target=torch.tensor(roots,dtype=torch.float32)[:,None]
     envelope=mapping['envelopeGuard']['envelope'];center=xyz(envelope['center']);radii=xyz(envelope['radii'])
     scale=xyz(mapping['metersPerSourceUnit']);threshold=1-mapping['envelopeGuard']['permittedInsetMeters']/float(radii.max())
     rotation=h.small_R_inv[indices];origin=h.small_origins[indices]
@@ -141,6 +137,8 @@ def main():
         guideCount=len(indices),initiallyViolatingGuides=int(initially_envelope_bad.sum()),finallyViolatingGuides=int((distances.min(dim=1).values<threshold).sum()),
         initiallyValidLatentsUnchanged=bool(torch.equal(latent.detach()[~active].cpu(),latent0[~active.cpu()])),
         scriptSHA256=sha256(Path(__file__)),penalty='mean_plus_max_segment_penetration_squared',cpuFallbackEnabled=False,
+        attachmentReplaySHA256=sha256(Path(__file__).with_name('scalp_attachments.py')),
+        nonzeroNormalOffsetAttachments=sum(mapping['mappings'][i]['binding']['normalOffsetMeters']!=0 for i in indices),
         sourceSHA256=sha256(args.source),textureSHA256=sha256(args.texture),inputSHA256=sha256(args.input),mappingSHA256=sha256(args.mapping),
         decoderSHA256=sha256(Path('.research/metal-assets/strand_ckpt.pth')),sourceReplayMaximumError=source_error,
         cpuMPSGradientMaximumDifference=gradient_error,cpuMPSGradientAgreement=gradient_agreement,

@@ -4,6 +4,8 @@ Updated: 2026-09-11. The full objective remains the implementation plan, M0 thro
 
 ## Implemented and verified
 
+- The local Metal optimizer/exporter now preserve canonical nonzero root offsets. Three new tests, actual 763-root replay and unchanged zero-offset export regression pass. A complete conditioning run retains all corrected roots but exposes six other guides needing their prior direction adjustments; a separate bounded fitting pass clears them and produces a replayable native research package within existing length/movement limits. Automatic durable post-fit integration remains open. See [offset regeneration](normal-offset-regeneration.md).
+
 - Live inspection now fits hair, scalp and any displayed face to the viewport with orthographic padding. The camera refits on viewport changes, preserving orbit/zoom across ordinary UI updates. All 167 core tests, the iOS build and the actual-candidate simulator edit/handoff test pass; the larger initial framing was visually inspected. AR alignment and geometry are unchanged. See [inspection framing](live-inspection-framing.md).
 
 - Fixed fringe trim availability to respect the saved brief and allow a valid target equal to the shortest guide when longer guides remain. All 165 core tests, the iOS build and a real-candidate simulator UI flow pass. The 40 mm edit changes 146 fringe guides, keeps 617 others and all roots/materials unchanged, retains supplied-face clearance, survives save/relaunch/undo/redo and reaches live inspection with the exact independently verified revision hash. Tracker landmarks are synthetic; physical alignment remains unresolved. See [trim handoff](normal-root-offsets.md#trim-and-native-preview-handoff).

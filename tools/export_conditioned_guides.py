@@ -13,6 +13,7 @@ import subprocess
 import uuid
 import numpy as np
 from safetensors.numpy import load_file
+from scalp_attachments import attachment_positions
 
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -60,13 +61,8 @@ def main():
     if not np.array_equal(data['originalMapped'][:,0],data['optimizedMapped'][:,0]):
         raise ValueError('Neural conditioning changed attachments')
     xyz=lambda v:np.array([v[k] for k in ('x','y','z')],dtype=float)
-    vertices=np.array([xyz(v) for v in inp['scalp']['vertices']]);triangles=np.array(inp['scalp']['triangles'])
-    roots=[]
-    for item in mapping['mappings']:
-        b=item['binding']
-        if b['normalOffsetMeters']!=0:raise ValueError('Conditioned export requires surface roots')
-        roots.append(np.array(b['barycentric'])@vertices[triangles[b['triangleIndex']]])
-    replay=(points-points[:,:1])*xyz(mapping['metersPerSourceUnit'])+np.array(roots)[:,None]
+    roots=attachment_positions(inp['scalp'],[item['binding'] for item in mapping['mappings']])
+    replay=(points-points[:,:1])*xyz(mapping['metersPerSourceUnit'])+roots[:,None]
     error=float(np.max(np.abs(replay-mapped)))
     if error>2e-6:raise ValueError('Template-to-person correspondence does not replay')
     out.mkdir(parents=True,exist_ok=False)
@@ -78,6 +74,8 @@ def main():
     cli('hair-conditioning-binding',out/'input.json',reg/'mapping.json',out/'binding.json')
     binding=read(out/'binding.json')
     manifest=dict(method='conditioned_curve_export_v1',scriptSHA256=digest(Path(__file__)),
+        attachmentReplaySHA256=digest(Path(__file__).with_name('scalp_attachments.py')),
+        nonzeroNormalOffsetAttachments=sum(item['binding']['normalOffsetMeters']!=0 for item in mapping['mappings']),
         baseSourceSHA256=digest(args.source),baseRunReportSHA256=source['runReportSHA256'],
         trajectoryReportSHA256=digest(args.trajectory_report),samplingSeed=seed,
         optimizationReportSHA256=digest(opt/'report.json'),regionalReportSHA256=digest(reg/'report.json'),

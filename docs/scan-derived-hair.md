@@ -165,12 +165,28 @@ with orientation evidence. It reports median and p95 axial errors from 0–90°.
 Camera-crossing segments and degenerate projections are excluded and counted.
 Absent evidence gives null errors rather than a perfect score. Segment
 subdivision affects sample weighting; sparse guides cannot provide a complete
-silhouette, density or reconstruction score. Occlusion is not yet tested.
+silhouette, density or reconstruction score. By default, occlusion is not tested.
 
-Four synthetic tests cover scaled intrinsics, undirected comparison, orthogonal
+Add `--use-capture-depth` to test samples against aligned capture depth. This
+verifies the depth and confidence payload hashes and requires image/depth
+timestamps within 10 ms. Only confidence-level 2 depth in the 0.05–5 m range
+supports a visibility decision; invalid or lower-confidence samples remain
+unknown and do not contribute orientation scores. A guide sample farther than
+the observed surface plus `--occlusion-margin` (default 0.01 m, experimental)
+is counted as occluded. Projected segments use reciprocal interpolation of
+camera Z. The margin is not a claim about sensor precision.
+
+The raw in-image mask agreement remains available separately from agreement on
+depth-supported visible samples. Neither metric includes silhouette coverage or
+validates registration. Sensor artifacts, transparent hair and coarse depth
+boundaries still require physical evaluation. This image-fitting diagnostic is
+separate from occlusion rendering in the live camera viewer.
+
+Six synthetic tests cover scaled intrinsics, undirected comparison, orthogonal
 error, missing support, camera crossings, invalid transforms/calibration and an
-end-to-end file-bound CLI comparison with stale-input rejection. Physical
-registration and occlusion checks remain necessary before using this diagnostic
+end-to-end file-bound CLI comparison with stale-input rejection. They also cover
+hidden/unknown-depth exclusion, perspective interpolation, timestamp rejection,
+and tampered depth payloads. Physical registration and occlusion validation remain necessary before using this diagnostic
 as a fitting objective. It never automatically accepts a haircut or registration.
 
 ```sh

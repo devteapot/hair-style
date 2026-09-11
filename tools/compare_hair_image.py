@@ -7,12 +7,24 @@ from pathlib import Path
 import numpy as np
 
 
-def compare_guides(guides, metadata, camera_from_hair, mask, axes):
+def compare_guides(guides, metadata, camera_from_hair, mask, axes, *, observed_depth=None,
+                   depth_confidence=None, occlusion_margin=.01):
     size = metadata['imageSize']; h, w = size['height'], size['width']
     if metadata['mirrored'] or metadata['pixelOrientation'] != 'sensor_native':
         raise ValueError('Requires native unmirrored images')
     if metadata['depthRectification'] not in ('arkit_aligned_scene_depth', 'synthetic_pinhole'):
         raise ValueError('Unrectified front-camera projection is not implemented here')
+    if observed_depth is not None:
+        ds = metadata['depthSize']; dh, dw = ds['height'], ds['width']
+        if observed_depth.shape != (dh, dw) or depth_confidence is None or depth_confidence.shape != (dh, dw):
+            raise ValueError('Depth and confidence dimensions must match calibration')
+        timestamps = [metadata['imageTimestamp'], metadata['depthTimestamp']]
+        if not np.isfinite(timestamps).all() or abs(timestamps[0]-timestamps[1]) > .01:
+            raise ValueError('Occlusion requires image/depth synchronization within 10 ms')
+        if metadata.get('depthEncoding') != 'float32_little_endian_meters':
+            raise ValueError('Occlusion requires metric float32 depth')
+        if not np.isfinite(occlusion_margin) or not 0 <= occlusion_margin <= .05:
+            raise ValueError('Occlusion margin must be between zero and 50 mm')
     if mask.dtype != np.bool_ or mask.shape != (h, w) or axes.shape != (h, w, 3):
         raise ValueError('Image evidence dimensions disagree')
     if not np.isfinite(axes).all() or np.any((axes[..., 2] < 0) | (axes[..., 2] > 1)):
@@ -31,7 +43,8 @@ def compare_guides(guides, metadata, camera_from_hair, mask, axes):
     if not np.isfinite(focal).all() or np.any(focal <= 0) or not np.isfinite(center).all():
         raise ValueError('Invalid intrinsics')
     counts = dict(segments=0, behindOrCrossingCamera=0, degenerateProjection=0,
-                  projectedSamples=0, outsideImageSamples=0, hairSamples=0, orientationSamples=0)
+                  projectedSamples=0, outsideImageSamples=0, hairSamples=0, orientationSamples=0,
+                  occludedSamples=0, unknownDepthSamples=0, visibleSamples=0, visibleHairSamples=0)
     errors = []
     for guide in guides:
         points = np.asarray(guide, dtype=float)
@@ -54,29 +67,49 @@ def compare_guides(guides, metadata, camera_from_hair, mask, axes):
             counts['projectedSamples'] += n
             if counts['projectedSamples'] > 2_000_000:
                 raise ValueError('Projected sample budget exceeded')
-            uv_samples = uv[0]+((np.arange(n)+.5)/n)[:, None]*delta
+            t = (np.arange(n)+.5)/n
+            uv_samples = uv[0]+t[:, None]*delta
             inside = (uv_samples[:, 0] >= 0) & (uv_samples[:, 0] < w) & (uv_samples[:, 1] >= 0) & (uv_samples[:, 1] < h)
             counts['outsideImageSamples'] += int((~inside).sum())
             xy = np.floor(uv_samples[inside]+.5).astype(int)
             xy[:, 0] = np.minimum(xy[:, 0], w-1); xy[:, 1] = np.minimum(xy[:, 1], h-1)
             hair = mask[xy[:, 1], xy[:, 0]]
             counts['hairSamples'] += int(hair.sum())
+            visible = np.ones(len(xy), dtype=bool)
+            if observed_depth is not None:
+                depth_xy = np.floor(uv_samples[inside]*[dw/w, dh/h]+.5).astype(int)
+                depth_xy[:, 0] = np.minimum(depth_xy[:, 0], dw-1)
+                depth_xy[:, 1] = np.minimum(depth_xy[:, 1], dh-1)
+                measured = observed_depth[depth_xy[:, 1], depth_xy[:, 0]]
+                confidence = depth_confidence[depth_xy[:, 1], depth_xy[:, 0]]
+                known = np.isfinite(measured) & (measured >= .05) & (measured <= 5) & (confidence == 2)
+                # Perspective-correct camera Z at a linearly interpolated image location.
+                guide_z = 1/((1-t[inside])/a[2]+t[inside]/b[2])
+                occluded = known & (guide_z > measured+occlusion_margin)
+                visible = known & ~occluded
+                counts['occludedSamples'] += int(occluded.sum())
+                counts['unknownDepthSamples'] += int((~known).sum())
+                counts['visibleSamples'] += int(visible.sum())
+                counts['visibleHairSamples'] += int((visible & hair).sum())
             evidence = axes[xy[:, 1], xy[:, 0]]
-            valid = hair & (evidence[:, 2] > 0)
+            valid = hair & visible & (evidence[:, 2] > 0)
             theta = np.arctan2(delta[1], delta[0])
             predicted = np.array([np.cos(2*theta), np.sin(2*theta)])
             dot = np.clip(evidence[valid, :2]@predicted, -1, 1)
             errors.extend(np.degrees(.5*np.arccos(dot)).tolist())
             counts['orientationSamples'] += int(valid.sum())
     in_image = counts['projectedSamples']-counts['outsideImageSamples']
-    return {'method': 'projected_guide_image_agreement_v1', **counts,
+    return {'method': 'projected_guide_image_agreement_v2' if observed_depth is not None else 'projected_guide_image_agreement_v1', **counts,
         'hairAgreementOfInImageSamples': counts['hairSamples']/in_image if in_image else None,
+        'hairAgreementOfVisibleSamples': counts['visibleHairSamples']/counts['visibleSamples'] if counts['visibleSamples'] else None,
         'orientationMedianDegrees': float(np.median(errors)) if errors else None,
         'orientationP95Degrees': float(np.percentile(errors, 95)) if errors else None,
-        'occlusionTested': False, 'registrationValidated': False, 'acceptedForFitting': False,
+        'occlusionTested': observed_depth is not None, 'occlusionMarginMeters': occlusion_margin if observed_depth is not None else None,
+        'registrationValidated': False, 'acceptedForFitting': False,
         'notes': ['Sparse guide samples are not a full hair silhouette, density estimate or reconstruction score.',
                   'Image axes are undirected. Orientation disagreement ranges from 0 to 90 degrees.',
-                  'No head/hair occlusion is tested; hidden guides may be compared with visible texture.',
+                  ('Occlusion uses high-confidence aligned depth with an experimental tolerance; sensor errors and hair transparency remain.'
+                   if observed_depth is not None else 'No head/hair occlusion is tested; hidden guides may be compared with visible texture.'),
                   'Segment samples are spaced at at most two pixels; subdivision changes sample weighting.',
                   'Behind-camera and crossing-camera segments are excluded and counted.']}
 
@@ -85,6 +118,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['bundle', 'evidence', 'haircut', 'alignment', 'output']:
         parser.add_argument(name, type=Path)
+    parser.add_argument('--use-capture-depth', action='store_true')
+    parser.add_argument('--occlusion-margin', type=float, default=.01)
     args = parser.parse_args()
     def sha(data): return hashlib.sha256(data).hexdigest()
     manifest_data = (args.bundle/'manifest.json').read_bytes(); manifest = json.loads(manifest_data)
@@ -107,9 +142,25 @@ def main():
     if np.any(mask > 1): raise ValueError('Invalid binary hair mask')
     axes = raster('texture-axis.f32', 'textureAxisSHA256', '<f4', (h, w, 3))
     guides = [[[p[k] for k in 'xyz'] for p in g['points']] for g in haircut['guides']]
-    result = compare_guides(guides, frame['metadata'], alignment['cameraFromHairRowMajor'], mask.astype(bool), axes)
+    depth = confidence = None
+    if args.use_capture_depth:
+        def payload(key, dtype):
+            record = frame[key]; path = (args.bundle/record['path']).resolve()
+            path.relative_to(args.bundle.resolve())
+            data = path.read_bytes()
+            if len(data) != record['byteCount'] or sha(data) != record['sha256']:
+                raise ValueError('Changed capture payload: '+key)
+            ds = frame['metadata']['depthSize']
+            return np.frombuffer(data, dtype=dtype).reshape(ds['height'], ds['width'])
+        depth = payload('depth', '<f4'); confidence = payload('confidence', np.uint8)
+        if frame['depth']['sha256'] != evidence['depthSHA256']:
+            raise ValueError('Depth identity differs from image analysis')
+    result = compare_guides(guides, frame['metadata'], alignment['cameraFromHairRowMajor'], mask.astype(bool), axes,
+        observed_depth=depth, depth_confidence=confidence, occlusion_margin=args.occlusion_margin)
     result.update(haircutFileSHA256=sha(haircut_data), evidenceReportSHA256=sha(report_data),
                   alignmentFileSHA256=sha(alignment_data), captureCondition=evidence['captureCondition'])
+    if args.use_capture_depth:
+        result.update(depthSHA256=frame['depth']['sha256'], depthConfidenceSHA256=frame['confidence']['sha256'])
     with args.output.open('x') as out: json.dump(result, out, indent=2); out.write('\n')
     print(json.dumps(result, indent=2))
 

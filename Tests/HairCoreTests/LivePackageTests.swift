@@ -2,6 +2,16 @@ import XCTest
 @testable import HairCore
 
 final class LivePackageTests: XCTestCase {
+    func testRibbonPackageRoundTripMatchesInteractiveCompiler() throws {
+        var value=try package();value.meshSettings = .init(radialSides:3,radiusScale:8,representation:.ribbon)
+        let restored=try ManifestCoding.decoder().decode(LivePreviewPackage.self,from:ManifestCoding.encoder().encode(value))
+        let live=try restored.prepareMesh()
+        let interactive=try HairRibbonCompiler.compile(input:value.input,haircut:value.haircut,radiusScale:8)
+        XCTAssertEqual(try HairArtifactHash.digest(live),try HairArtifactHash.digest(interactive))
+        XCTAssertEqual(live.haircutSHA256,try HairArtifactHash.digest(value.haircut))
+        let legacy=try ManifestCoding.decoder().decode(LiveMeshSettings.self,from:Data("{\"radialSides\":3,\"radiusScale\":8}".utf8))
+        XCTAssertNil(legacy.representation)
+    }
     private func package() throws -> LivePreviewPackage {
         let (input, haircut) = try SyntheticHaircut.create()
         let positions = [(-0.08,-0.08),(0.08,-0.08),(-0.08,0.08),(0.08,0.08),(-0.03,-0.02),(0.04,-0.01),(0.0,0.05)]

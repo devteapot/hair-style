@@ -47,7 +47,7 @@ Tasks:
 2. Implement masks and filtering for hair, clips, background, low-quality depth and subject motion.
 3. Fit per-frame head pose, fuse usable observations, and register front/rear passes using visible skin overlap.
 4. Fit scalp/head completion behind occlusion and retain inferred-region masks. Do not use a tied bun as skull geometry.
-5. Derive a minimal hair profile: visible hairline, texture descriptors, part/flow and regional uncertainty. Record unsupported properties as unknown.
+5. Derive a minimal hair profile: visible hairline, texture descriptors, part/flow and regional uncertainty. Build the current-hair appearance baseline from reviewed untied-hair views, including supported silhouette/envelope and appearance estimates, following [scan-derived hair appearance](scan-derived-hair.md). Record unsupported properties as unknown.
 6. Reconstruct repeated captures and produce regional error reports, overlay renders and targeted rescan instructions.
 
 Evidence: registered head asset and provenance report for each pilot; paired repeat scans; failure examples for motion and insufficient overlap.

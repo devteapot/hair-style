@@ -105,6 +105,7 @@ final class LivePreviewModel: NSObject, ObservableObject, ARSessionDelegate {
                 let element = SCNGeometryElement(data: batch.indices.withUnsafeBytes { Data($0) }, primitiveType: .triangles,
                     primitiveCount: batch.indices.count/3, bytesPerIndex: 4)
                 let geometry = SCNGeometry(sources: [positions,normals], elements: [element])
+                geometry.firstMaterial?.isDoubleSided = mesh.method == "guide_ribbon_mesh_v1"
                 if let material = mesh.materials.first(where: { $0.id == batch.materialID }) {
                     geometry.firstMaterial?.diffuse.contents = UIColor(red: CGFloat(material.linearRGB[0]),
                         green: CGFloat(material.linearRGB[1]), blue: CGFloat(material.linearRGB[2]), alpha: 1)

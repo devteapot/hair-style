@@ -95,6 +95,16 @@ func run() throws {
         let mesh = try HairMeshCompiler.compile(input: input, haircut: haircut, radialSides: sides, radiusScale: scale)
         try ManifestCoding.encoder().encode(mesh).write(to: URL(fileURLWithPath: args[3]), options: .atomic)
         print("Compiled \(mesh.guideCount) guides into \(mesh.vertices.count) vertices. Canonical revision hash: \(mesh.haircutSHA256).")
+    case "hair-ribbon-mesh":
+        guard (4...5).contains(args.count) else { throw CaptureError.invalid("hair-ribbon-mesh requires INPUT.json HAIRCUT.json OUTPUT.json [RADIUS_SCALE].") }
+        let input=try ManifestCoding.decoder().decode(HairDesignInput.self,from:Data(contentsOf:URL(fileURLWithPath:args[1])))
+        let haircut=try ManifestCoding.decoder().decode(HaircutRevision.self,from:Data(contentsOf:URL(fileURLWithPath:args[2])))
+        let scale: Double
+        if args.count==5 { guard let value=Double(args[4]) else { throw CaptureError.invalid("Invalid ribbon radius scale.") };scale=value }
+        else { scale=1 }
+        let mesh=try HairRibbonCompiler.compile(input:input,haircut:haircut,radiusScale:scale)
+        try ManifestCoding.encoder().encode(mesh).write(to:URL(fileURLWithPath:args[3]),options:.atomic)
+        print("Compiled \(mesh.guideCount) guides into \(mesh.vertices.count) ribbon vertices. Canonical source unchanged.")
     case "hair-model-import":
         guard args.count == 5 else { throw CaptureError.invalid("hair-model-import requires INPUT.json SOURCE_STRANDS.json MAPPING.json RESULT.json.") }
         let input = try ManifestCoding.decoder().decode(HairDesignInput.self, from: Data(contentsOf: URL(fileURLWithPath: args[1])))

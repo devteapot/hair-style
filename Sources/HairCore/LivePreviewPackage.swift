@@ -3,6 +3,10 @@ import Foundation
 public struct LiveMeshSettings: Codable, Sendable {
     public var radialSides: Int
     public var radiusScale: Double
+    public var representation: HairMeshRepresentation?
+    public init(radialSides: Int, radiusScale: Double, representation: HairMeshRepresentation? = nil) {
+        self.radialSides = radialSides; self.radiusScale = radiusScale; self.representation = representation
+    }
     public static let modelReview = LiveMeshSettings(radialSides: 3, radiusScale: 8)
 }
 
@@ -50,6 +54,12 @@ public struct LivePreviewPackage: Codable, Sendable {
         _ = try RigidRegistration.register(RegistrationInput(sourceFrameID: "personal_canonical", targetFrameID: "preflight_copy",
             evidenceSource: input.scalp.triangleOrigins.contains(.synthetic) ? .syntheticFixture : .sensor,
             fitPairs: Array(pairs.prefix(fitLandmarks.count)), validationPairs: Array(pairs.suffix(validationLandmarks.count))))
+        if meshSettings?.representation == .ribbon {
+            guard let settings=meshSettings, (3...12).contains(settings.radialSides) else {
+                throw CaptureError.invalid("Invalid retained mesh resolution settings.")
+            }
+            return try HairRibbonCompiler.compile(input:input,haircut:haircut,radiusScale:settings.radiusScale)
+        }
         return try HairMeshCompiler.compile(input: input, haircut: haircut,
             radialSides: meshSettings?.radialSides ?? 6, radiusScale: meshSettings?.radiusScale ?? 1)
     }

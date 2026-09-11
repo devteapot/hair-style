@@ -209,6 +209,7 @@ final class HairLabStore: ObservableObject {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         var directory = modelReview ? "ModelHairLab" : "HairLab"
         #if targetEnvironment(simulator)
+        if !modelReview && ProcessInfo.processInfo.arguments.contains("--recorded-color-test") { directory = "RecordedColorStudioTest" }
         if modelReview && ProcessInfo.processInfo.arguments.contains("--conditioned-model-review-test") { directory = "ConditionedModelReviewTest" }
         if modelReview && ProcessInfo.processInfo.arguments.contains("--refined-model-review-test") { directory = "RefinedModelReviewTest" }
         if modelReview && ProcessInfo.processInfo.arguments.contains("--prepared-pipeline-model-review-test") { directory = "PreparedPipelineModelReviewTest" }
@@ -249,12 +250,12 @@ final class HairLabStore: ObservableObject {
             if consumePrepared { try FileManager.default.removeItem(at:url) }
         } catch { self.error=error.localizedDescription }
     }
-    func preview(operation: HairEditOperation, region: HairRegion, value: Double) async {
+    func preview(operation: HairEditOperation, region: HairRegion, value: Double, recordedColor: RecordedHairColor? = nil) async {
         guard !busy, let base = snapshot else { return }
         busy=true;defer {busy=false}
         ticket += 1; let request = ticket
         preview = nil; previewMesh=nil; error = nil
-        let edit = HairEdit(baseSHA256: base.hash, operation: operation, region: region, value: value)
+        let edit = HairEdit(baseSHA256: base.hash, operation: operation, region: region, value: value, recordedColor: recordedColor)
         do {
             let usesModel=modelReview
             let (result,mesh) = try await Task.detached {

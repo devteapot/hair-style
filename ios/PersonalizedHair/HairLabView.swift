@@ -10,6 +10,7 @@ struct HairLabView: View {
     private let candidate: CandidateStudioID?
     @State private var importing=false
     @State private var showPreparation=false
+    @State private var showRecordedColor=false
     init(modelReview:Bool=false, candidate:CandidateStudioID?=nil) {
         self.modelReview=modelReview
         self.candidate=candidate
@@ -97,7 +98,7 @@ struct HairLabView: View {
                     Text(modelReview ? "Fringe \(range(record.haircut,region:.fringe)) mm · crown \(range(record.haircut,region:.crown)) mm" : "Fringe \(fringeLength(record.haircut)) mm · crown \(crownLength(record.haircut)) mm")
                         .font(.caption.monospacedDigit()).accessibilityIdentifier("hairLengths")
                     Toggle("Compare with original", isOn: $compare).accessibilityIdentifier("compareHairOriginal")
-                    Text(modelReview ? "Orbit with one finger; pinch to zoom. Gray is the recorded face, amber the inferred scalp, and green the fringe. Guides are enlarged for inspection." : "Orbit with one finger; pinch to zoom. Green is the fringe, amber is the crown. Root dots remain attached to the fixture.")
+                    Text(modelReview ? "Orbit with one finger; pinch to zoom. Gray is the recorded face, amber the inferred scalp, and green the fringe. Guides are enlarged for inspection." : "Orbit with one finger; pinch to zoom. Colored root dots distinguish the fringe and crown. Hair uses the saved material color.")
                         .font(.footnote).foregroundStyle(Theme.ink.opacity(0.8))
                     HaircutExplanationView(record: record)
                     NavigationLink("Preferences for a new design") {
@@ -127,6 +128,14 @@ struct HairLabView: View {
                             compare=false
                             Task { await store.preview(operation:.rotateAroundRootNormal,region:.fringe,value:fringeDirectionDegrees) }
                         }.disabled(fringeDirectionDegrees == 0).accessibilityIdentifier("previewFringeDirection")
+                        Button("Match color from a saved capture") { showRecordedColor = true }
+                            .accessibilityIdentifier("chooseRecordedHairColor")
+                            .sheet(isPresented: $showRecordedColor) {
+                                RecordedColorSourceView(subjectSessionID: snapshot.selected.input.scalp.subjectSessionID) { color, region in
+                                    showRecordedColor = false; compare = false
+                                    Task { await store.preview(operation: .matchRecordedColor, region: region, value: 0, recordedColor: color) }
+                                }
+                            }
                         Button("Preview 20% less crown volume") {
                             compare = false
                             Task { await store.preview(operation: .scaleLateralVolume, region: .crown, value: 0.8) }
@@ -353,7 +362,10 @@ struct HairGuideScene: UIViewRepresentable {
                 let element = SCNGeometryElement(data: batch.indices.withUnsafeBytes { Data($0) },
                     primitiveType: .triangles, primitiveCount: batch.indices.count/3, bytesPerIndex: 4)
                 let geometry = SCNGeometry(sources: [positions, normals], elements: [element])
-                geometry.firstMaterial?.diffuse.contents = batch.region == .fringe ? UIColor(Theme.accent) : (isModel ? UIColor(red:0.18,green:0.11,blue:0.075,alpha:1) : UIColor(red: 0.74,green: 0.39,blue: 0.13,alpha: 1))
+                if let material = mesh.materials.first(where: { $0.id == batch.materialID }) {
+                    geometry.firstMaterial = HairSceneMaterials.make(material)
+                }
+                geometry.firstMaterial?.isDoubleSided = mesh.method == "guide_ribbon_mesh_v1"
                 content.addChildNode(SCNNode(geometry: geometry))
             }
             for guide in record.haircut.guides where !isModel {

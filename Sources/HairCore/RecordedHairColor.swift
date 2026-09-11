@@ -16,6 +16,14 @@ public struct RecordedHairColor: Codable, Sendable {
         return Self(subjectSessionID: manifest.subjectSessionID, captureID: report.captureID,
             frameID: report.frameID, reportSHA256: EvidenceHash.sha256(data), imageSHA256: report.imageSHA256, rgb: color.median)
     }
+    public static func saved(bundle: URL, frameID: String) throws -> Self? {
+        let url = try HairImageAnalysis.location(bundle: bundle, frameID: frameID)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        guard let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 1_048_576 else {
+            throw CaptureError.invalid("Saved image report is too large.")
+        }
+        return try fromReport(Data(contentsOf: url), bundle: bundle, frameID: frameID)
+    }
     func validate(subjectSessionID: String) throws {
         guard self.subjectSessionID == subjectSessionID, UUID(uuidString: captureID) != nil,
               UUID(uuidString: frameID) != nil, HairArtifactHash.valid(reportSHA256), HairArtifactHash.valid(imageSHA256),

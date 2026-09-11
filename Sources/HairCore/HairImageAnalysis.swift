@@ -77,7 +77,7 @@ public struct HairImageAnalysis: Codable, Sendable {
         return value
     }
 
-    private static func location(bundle: URL, frameID: String) throws -> URL {
+    static func location(bundle: URL, frameID: String) throws -> URL {
         guard UUID(uuidString: frameID) != nil else { throw CaptureError.invalid("Invalid frame identifier.") }
         return bundle.appendingPathComponent("analysis/hair/\(frameID).json")
     }

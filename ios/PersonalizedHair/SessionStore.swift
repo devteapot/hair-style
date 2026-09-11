@@ -50,7 +50,12 @@ final class SessionStore: ObservableObject {
             let captureRoot = root
             let fixtureURL = try await Task.detached { try SyntheticCapture.create(in: captureRoot) }.value
             #if targetEnvironment(simulator)
-            if ProcessInfo.processInfo.arguments.contains("--hair-analysis-review-test") {
+            if ProcessInfo.processInfo.arguments.contains("--hair-analysis-review-test") || ProcessInfo.processInfo.arguments.contains("--recorded-color-test") {
+                if ProcessInfo.processInfo.arguments.contains("--recorded-color-test") {
+                    var fixture = try CaptureBundle.load(fixtureURL)
+                    fixture.subjectSessionID = "synthetic-haircut"
+                    try ManifestCoding.encoder().encode(fixture).write(to: fixtureURL.appendingPathComponent("manifest.json"), options: .atomic)
+                }
                 let manifestData = try Data(contentsOf: fixtureURL.appendingPathComponent("manifest.json"))
                 let manifest = try CaptureBundle.load(fixtureURL)
                 let frame = manifest.frames[0]
@@ -65,7 +70,11 @@ final class SessionStore: ObservableObject {
                             "median": [20, 30, 40], "intrinsicColorCalibrated": false]],
                     "acceptedForNaturalHairBaseline": false, "registeredToHead": false]
                 let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                try JSONSerialization.data(withJSONObject: report).write(to: documents.appendingPathComponent("Hair analysis fixture.json"), options: .atomic)
+                let reportData = try JSONSerialization.data(withJSONObject: report)
+                try reportData.write(to: documents.appendingPathComponent("Hair analysis fixture.json"), options: .atomic)
+                if ProcessInfo.processInfo.arguments.contains("--recorded-color-test") {
+                    _ = try HairImageAnalysis.save(reportData, bundle: fixtureURL, frameID: frame.metadata.id)
+                }
             }
             #endif
             reload()

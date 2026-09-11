@@ -120,9 +120,16 @@ tools/dev.sh swift run capture-inspect hair-image-color \
 The actual tied-frame experiment changes material assignments for 146 fringe
 guides while preserving geometry for all 763 guides and leaving every other
 region unchanged. The diagnostic revision remains private and does not replace
-the saved studio candidate. All 159 core tests and the iOS build pass. Native
-source-selection controls for this edit and visual evaluation remain unfinished;
-color alone does not establish personalized haircut design or realism.
+the saved studio candidate. All 159 core tests and the iOS build pass. The studio now offers “Match color from a saved capture,” with region selection
+and same-subject report filtering. It uses the existing preview/save/undo workflow.
+Both studio and live viewer read canonical material color and roughness through
+a shared linear-to-sRGB conversion; hardcoded hair-region colors are removed.
+Diagnostic root markers remain colored. Color alone does not establish
+personalized haircut design or realism. A simulator UI test selects a saved
+same-subject report, previews and saves revision 2, then verifies undo/redo. The
+persisted edit's source hash, subject and RGB were independently inspected, and
+the final guide-render screenshot was reviewed. Physical-device color fidelity
+and appearance matching remain unvalidated.
 
 ## Local image-evidence command
 

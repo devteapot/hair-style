@@ -137,8 +137,9 @@ def main():
     confidence = np.rot90(confidence, -ROTATIONS[args.rotation]).copy()
     if args.target == 'hair':
         # Retain full RGB resolution; this artifact does not register or fuse depth.
-        from hair_image_observations import observe_hair
+        from hair_image_observations import observe_hair, texture_orientation
         mask, interior, observation = observe_hair(native, labels, confidence, args.confidence)
+        orientation, orientation_report = texture_orientation(native, mask)
         args.output.mkdir(parents=True, exist_ok=False)
         labels_data, confidence_data = labels.tobytes(), confidence.astype('<f4').tobytes()
         (args.output/'labels.u8').write_bytes(labels_data)
@@ -147,6 +148,8 @@ def main():
         (args.output/'hair-mask.u8').write_bytes(mask_data)
         interior_data = interior.astype(np.uint8).tobytes()
         (args.output/'hair-interior.u8').write_bytes(interior_data)
+        orientation_data = orientation.astype('<f4').tobytes()
+        (args.output/'texture-axis.f32').write_bytes(orientation_data)
         report = {'schemaVersion': 1, 'method': 'local_segformer_hair_image_v1',
                   'captureID': manifest['id'], 'frameID': metadata['id'], 'frameIndex': args.frame_index,
                   'sourceManifestSHA256': digest(manifest_data), 'imageSHA256': digest(image_data),
@@ -159,6 +162,7 @@ def main():
                   'captureConditionSource': 'operator_assertion' if args.capture_condition != 'unknown' else 'unknown',
                   'labelsSHA256': digest(labels_data), 'posteriorSHA256': digest(confidence_data),
                   'maskSHA256': digest(mask_data), 'interiorMaskSHA256': digest(interior_data),
+                  'textureAxisSHA256': digest(orientation_data), 'textureOrientation': orientation_report,
                   'observation': observation, 'acceptedForNaturalHairBaseline': False,
                   'registeredToHead': False, 'commercialUseCleared': False,
                   'notes': ['Research/educational model only per author card.',
@@ -175,6 +179,19 @@ def main():
                 ['Recorded RGB', 'Inferred hair; review required', 'Interior for recorded color']):
             ax.imshow(np.rot90(data, ROTATIONS[args.rotation])); ax.set_title(title); ax.axis('off')
         fig.tight_layout(); fig.savefig(args.output/'diagnostic.png', dpi=140); plt.close(fig)
+        from matplotlib.collections import LineCollection
+        fig, ax = plt.subplots(figsize=(10, 8))
+        ax.imshow(native)
+        yy, xx = np.mgrid[12:native.shape[0]:24, 12:native.shape[1]:24]
+        values = orientation[yy, xx]
+        valid = values[..., 2] > 0
+        centers = np.stack([xx[valid], yy[valid]], axis=-1)
+        theta = .5*np.arctan2(values[..., 1][valid], values[..., 0][valid])
+        delta = 8*np.stack([np.cos(theta), np.sin(theta)], axis=-1)
+        ax.add_collection(LineCollection(np.stack([centers-delta, centers+delta], axis=1),
+                                        colors='cyan', linewidths=.6))
+        ax.set_title('Native image texture axes; undirected, unvalidated'); ax.axis('off')
+        fig.tight_layout(); fig.savefig(args.output/'texture-axis-diagnostic.png', dpi=140); plt.close(fig)
         print(json.dumps(observation, indent=2))
         return
     if labels.shape != depth.shape:

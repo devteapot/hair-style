@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from hair_image_observations import observe_hair
+from hair_image_observations import observe_hair, texture_orientation
 
 
 class HairImageObservationTests(unittest.TestCase):
@@ -42,6 +42,43 @@ class HairImageObservationTests(unittest.TestCase):
         for posterior in [np.ones((19, 20)), np.full((20, 20), np.nan), np.full((20, 20), 1.1)]:
             with self.assertRaises(ValueError):
                 observe_hair(rgb, labels, posterior)
+
+    def test_orientation_tracks_texture_tangent_with_180_degree_ambiguity(self):
+        y, x = np.mgrid[:96, :96]
+        for gradient, expected in [(y, [1, 0]), (x, [-1, 0]), (x+y, [0, -1])]:
+            gray = np.round(128+100*np.sin(gradient*.3)).astype(np.uint8)
+            rgb = np.repeat(gray[..., None], 3, axis=2)
+            field, report = texture_orientation(rgb, np.ones(gray.shape, dtype=bool))
+            supported = field[..., 2] > 0
+            self.assertGreater(report['supportedPixels'], 1000)
+            np.testing.assert_allclose(field[supported, :2].mean(axis=0), expected, atol=.002)
+            np.testing.assert_allclose(np.linalg.norm(field[supported, :2], axis=1), 1, atol=1e-6)
+            self.assertFalse(report['directed'])
+            inverted, _ = texture_orientation(255-rgb, np.ones(gray.shape, dtype=bool))
+            np.testing.assert_allclose(field, inverted, atol=1e-6)
+            rotated, _ = texture_orientation(np.rot90(rgb), np.ones(gray.shape, dtype=bool))
+            expected_rotated = np.rot90(field).copy()
+            expected_rotated[..., :2] *= -1
+            np.testing.assert_allclose(rotated, expected_rotated, atol=1e-6)
+
+    def test_orientation_has_no_support_on_flat_or_mask_boundary(self):
+        rgb = np.full((50, 50, 3), 128, dtype=np.uint8)
+        mask = np.ones((50, 50), dtype=bool)
+        field, report = texture_orientation(rgb, mask)
+        self.assertEqual(report['supportedPixels'], 0)
+        self.assertTrue(np.all(field == 0))
+        rgb[:] = np.round(128+100*np.sin(np.arange(50)*.3)).astype(np.uint8)[:, None, None]
+        mask[:, 24:26] = False
+        field, _ = texture_orientation(rgb, mask)
+        self.assertTrue(np.all(field[:, 16:34] == 0))
+        self.assertGreater(np.count_nonzero(field[..., 2]), 0)
+
+    def test_orientation_rejects_invalid_inputs(self):
+        rgb = np.zeros((20, 20, 3), dtype=np.uint8)
+        mask = np.ones((20, 20), dtype=bool)
+        for kwargs in [dict(radius=0), dict(minimum_coherence=float('nan')), dict(minimum_energy=-1)]:
+            with self.assertRaises(ValueError): texture_orientation(rgb, mask, **kwargs)
+        with self.assertRaises(ValueError): texture_orientation(rgb, mask.astype(np.uint8))
 
 
 if __name__ == '__main__':

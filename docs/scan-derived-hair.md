@@ -107,3 +107,27 @@ and nonhair rejection, image-edge erosion and invalid arrays:
 
 The reused model remains research-only under the recorded model-card terms;
 commercial use is not cleared by this implementation.
+
+### Apparent texture orientation
+
+Hair extraction also writes `texture-axis.f32`: an H × W × 3 interleaved
+little-endian float32 field in native image coordinates. Each supported pixel
+contains `(cos(2θ), sin(2θ), coherence)` for an undirected local texture axis.
+The doubled angle deliberately prevents a root-to-tip direction claim.
+Unsupported pixels are `(0, 0, 0)`. The file hash and processing parameters are
+included in the report, with a separate native-image diagnostic overlay.
+
+The current estimator uses a 15 × 15 box-averaged image gradient tensor and its
+smaller-eigenvalue axis. It requires the window and derivative halo to lie within
+the inferred hair mask, with sufficient gradient energy and anisotropy. These
+thresholds are experimental. Coherence is a property of image texture, not a
+calibrated probability that the axis matches a strand. Highlights, clump edges,
+motion blur and segmentation errors can mislead it. It performs no 3D lifting or
+root inference, and does not automatically update `HairCharacteristics`.
+
+The tied-frame diagnostic had 95,324 supported pixels out of 459,683 inferred
+hair pixels (about 21%). Visual inspection showed sparse support and variation
+around highlights; no orientation-accuracy or styling-quality gate is claimed.
+Seven synthetic tests now cover image observations and orientation, including
+known horizontal/vertical/diagonal texture tangents, contrast reversal,
+quarter-turn coordinate behavior, absent texture and boundary exclusions.

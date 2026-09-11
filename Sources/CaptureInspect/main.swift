@@ -84,6 +84,21 @@ func run() throws {
         let package=try result.modelReviewPackage(scalpReview:scalp)
         try ManifestCoding.encoder().encode(package).write(to:output,options:.atomic)
         print("Created exact candidate review handoff. Physical/style acceptance remains false.")
+    case "hair-image-color":
+        guard args.count == 8, let region = HairRegion(rawValue: args[6]) else {
+            throw CaptureError.invalid("hair-image-color requires INPUT.json HAIRCUT.json CAPTURE_BUNDLE FRAME_ID REPORT.json REGION OUTPUT.json.")
+        }
+        let input = try ManifestCoding.decoder().decode(HairDesignInput.self, from: Data(contentsOf: URL(fileURLWithPath: args[1])))
+        let haircut = try ManifestCoding.decoder().decode(HaircutRevision.self, from: Data(contentsOf: URL(fileURLWithPath: args[2])))
+        let reportURL = URL(fileURLWithPath: args[5])
+        guard let size = try reportURL.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 1_048_576 else { throw CaptureError.invalid("Color report is too large.") }
+        let color = try RecordedHairColor.fromReport(Data(contentsOf: reportURL), bundle: URL(fileURLWithPath: args[3]), frameID: args[4])
+        let edit = HairEdit(baseSHA256: try HairArtifactHash.digest(haircut), operation: .matchRecordedColor, region: region, value: 0, recordedColor: color)
+        let result = try HaircutEditor.apply(edit, to: haircut, input: input)
+        let output = URL(fileURLWithPath: args[7])
+        guard !FileManager.default.fileExists(atPath: output.path) else { throw CaptureError.invalid("Output already exists.") }
+        try ManifestCoding.encoder().encode(result.haircut).write(to: output, options: .atomic)
+        print("Created approximate recorded-color revision for \(result.changedGuideIDs.count) guides. Geometry and fit status are unchanged.")
     case "hair-image-review":
         guard args.count == 4 else { throw CaptureError.invalid("hair-image-review requires CAPTURE_BUNDLE FRAME_ID REPORT.json.") }
         let reportURL = URL(fileURLWithPath: args[3])

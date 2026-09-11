@@ -636,6 +636,8 @@ private struct HaircutExplanationView: View {
                     }
                     if let edit = report.lastEdit {
                         switch edit.operation {
+                        case .matchRecordedColor:
+                            Text("Last edit: approximate \(name(edit.region).lowercased()) color from a recorded image. Lighting is uncorrected; guide geometry is preserved.")
                         case .shortenToLength:
                             Text("Last edit: shorten \(name(edit.region).lowercased()) to at most \(mm(edit.value)) mm.")
                         case .scaleLateralVolume:

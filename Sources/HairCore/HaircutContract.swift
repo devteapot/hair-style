@@ -105,6 +105,7 @@ public struct HairGenerationRecord: Codable, Sendable {
 public enum HairEditOperation: String, Codable, Sendable {
     case shortenToLength = "shorten_to_length", scaleLateralVolume = "scale_lateral_volume"
     case rotateAroundRootNormal = "rotate_around_root_normal"
+    case matchRecordedColor = "match_recorded_color"
 }
 public struct HairEdit: Codable, Sendable {
     public var baseSHA256: String
@@ -112,9 +113,11 @@ public struct HairEdit: Codable, Sendable {
     public var region: HairRegion
     /// Meters for shortening; dimensionless factor for lateral volume; degrees
     /// for right-handed rotation about each attachment's outward scalp normal.
+    /// Recorded-color edits use zero and carry their separate image evidence.
     public var value: Double
-    public init(baseSHA256: String, operation: HairEditOperation, region: HairRegion, value: Double) {
-        self.baseSHA256 = baseSHA256; self.operation = operation; self.region = region; self.value = value
+    public var recordedColor: RecordedHairColor? = nil
+    public init(baseSHA256: String, operation: HairEditOperation, region: HairRegion, value: Double, recordedColor: RecordedHairColor? = nil) {
+        self.baseSHA256 = baseSHA256; self.operation = operation; self.region = region; self.value = value; self.recordedColor = recordedColor
     }
 }
 public struct HaircutRevision: Codable, Sendable {
@@ -176,6 +179,12 @@ public enum HaircutValidator {
                   let edit = haircut.edit, edit.baseSHA256 == parent, edit.value.isFinite else {
                 throw CaptureError.invalid("Edited haircut must retain its parent hash and operation.")
             }
+        }
+        if let edit = haircut.edit {
+            if edit.operation == .matchRecordedColor {
+                guard edit.value == 0, let color = edit.recordedColor else { throw CaptureError.invalid("Color edit lacks image evidence.") }
+                try color.validate(subjectSessionID: input.scalp.subjectSessionID)
+            } else if edit.recordedColor != nil { throw CaptureError.invalid("Geometry edit cannot carry a color change.") }
         }
         guard (1...64).contains(haircut.materials.count), (1...20_000).contains(haircut.guides.count) else {
             throw CaptureError.invalid("Haircut exceeds material/guide processing limits.")

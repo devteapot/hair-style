@@ -97,6 +97,33 @@ CAPTURE_BUNDLE FRAME_ID REPORT.json`. It successfully checked the existing
 local tied-frame report (459,683 inferred hair pixels); this verifies contract
 compatibility and source binding, not physical analysis accuracy.
 
+### Recorded-color revision
+
+The canonical editor supports `match_recorded_color` for one region. Its edit
+record retains the source capture/frame, report and image hashes, subject session
+and recorded RGB. The report must pass native image validation, and its subject
+must match the design input. RGB is treated as sRGB and converted to linear RGB
+for the material: this is an explicit preview approximation with no illuminant
+or camera-profile correction, not a measurement of intrinsic hair color.
+
+The editor clones shared materials as needed so other regions keep their
+appearance, preserves every guide point/root and retains the parent revision.
+Repository replay reproduces the change, and both tube and ribbon compilers
+receive the same materials. A supplied clearance report is retained; a color
+change neither resolves existing intersections nor changes their geometry.
+
+```sh
+tools/dev.sh swift run capture-inspect hair-image-color \
+  INPUT.json HAIRCUT.json CAPTURE_BUNDLE FRAME_ID REPORT.json fringe OUTPUT.json
+```
+
+The actual tied-frame experiment changes material assignments for 146 fringe
+guides while preserving geometry for all 763 guides and leaving every other
+region unchanged. The diagnostic revision remains private and does not replace
+the saved studio candidate. All 159 core tests and the iOS build pass. Native
+source-selection controls for this edit and visual evaluation remain unfinished;
+color alone does not establish personalized haircut design or realism.
+
 ## Local image-evidence command
 
 With the existing pinned face-parsing model and local research environment:

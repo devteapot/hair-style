@@ -3,6 +3,7 @@ import Foundation
 public struct HairEditResult: Codable, Sendable {
     public var haircut: HaircutRevision
     public var validation: HairValidationReport
+    /// Guides whose geometry or material assignment changed.
     public var changedGuideIDs: [String]
     public var clearance: GuideClearanceReport?
 }
@@ -24,7 +25,10 @@ public enum HaircutEditor {
         _ = try HaircutValidator.validate(input: input, haircut: base)
         guard edit.baseSHA256 == (try HairArtifactHash.digest(base)), edit.value.isFinite,
               base.revision < 1_000_000 else { throw CaptureError.invalid("Edit refers to a stale base or has an invalid value.") }
+        if edit.operation == .matchRecordedColor { return try recolor(edit, base: base, input: input, anatomy: anatomy) }
+        guard edit.recordedColor == nil else { throw CaptureError.invalid("Geometry edit cannot carry color evidence.") }
         switch edit.operation {
+        case .matchRecordedColor: throw CaptureError.invalid("Unexpected color operation.")
         case .shortenToLength:
             guard (0.001...1.5).contains(edit.value) else { throw CaptureError.invalid("Invalid target curve length.") }
         case .rotateAroundRootNormal:
@@ -37,6 +41,7 @@ public enum HaircutEditor {
             let guide = base.guides[index]
             let points: [Point3D]
             switch edit.operation {
+            case .matchRecordedColor: throw CaptureError.invalid("Unexpected color operation.")
             case .shortenToLength:
                 let length = try HaircutValidator.arcLength(guide.points)
                 guard edit.value <= length + 1e-9 else { throw CaptureError.invalid("Shortening cannot extend a guide. Generate a new design for added length.") }
@@ -70,6 +75,38 @@ public enum HaircutEditor {
             throw CaptureError.invalid("Edit intersects or violates clearance from supplied anatomy (\(clearance.violations.count) affected guide segments). Previous revision is preserved.")
         }
         return HairEditResult(haircut: result, validation: report, changedGuideIDs: changed, clearance: clearance)
+    }
+
+    private static func recolor(_ edit: HairEdit, base: HaircutRevision, input: HairDesignInput,
+                                anatomy: GuideClearanceInput?) throws -> HairEditResult {
+        guard edit.value == 0, let evidence = edit.recordedColor else { throw CaptureError.invalid("Color edit needs recorded image evidence.") }
+        try evidence.validate(subjectSessionID: input.scalp.subjectSessionID)
+        let color = evidence.linearRGB
+        var result = base, changed: [String] = [], replacements: [String: String] = [:]
+        var usedIDs = Set(base.materials.map(\.id))
+        let originals = Dictionary(uniqueKeysWithValues: base.materials.map { ($0.id, $0) })
+        for i in result.guides.indices where result.guides[i].region == edit.region {
+            let sourceID = result.guides[i].materialID
+            guard var material = originals[sourceID] else { throw CaptureError.invalid("Missing hair material.") }
+            if zip(material.linearRGB, color).allSatisfy({ abs($0-$1) < 1e-12 }) { continue }
+            if let replacement = replacements[sourceID] { result.guides[i].materialID = replacement }
+            else {
+                let token = EvidenceHash.sha256(Data((sourceID+evidence.reportSHA256+edit.region.rawValue).utf8)).prefix(24)
+                var id = "photo-\(token)", suffix = 0
+                while usedIDs.contains(id) { suffix += 1; id = "photo-\(token)-\(suffix)" }
+                usedIDs.insert(id); material.id = id; material.linearRGB = color
+                result.materials.append(material); replacements[sourceID] = id; result.guides[i].materialID = id
+            }
+            changed.append(result.guides[i].id)
+        }
+        guard !changed.isEmpty else { throw CaptureError.invalid("Recorded color changes no materials in this region.") }
+        let referenced = Set(result.guides.map(\.materialID))
+        result.materials.removeAll { !referenced.contains($0.id) }
+        result.revision += 1; result.parentSHA256 = edit.baseSHA256; result.edit = edit
+        let validation = try HaircutValidator.validate(input: input, haircut: result)
+        // Color cannot resolve or introduce a geometric collision; retain the report without claiming clearance.
+        let clearance = try anatomy.map { try GuideClearance.check(input: input, haircut: result, anatomy: $0) }
+        return HairEditResult(haircut: result, validation: validation, changedGuideIDs: changed, clearance: clearance)
     }
 
     private static func trim(_ points: [Point3D], at target: Double) -> [Point3D] {

@@ -130,11 +130,15 @@ public struct ProcessingConditioningResult: Codable, Sendable {
             clearance = try GuideClearance.check(input:prepared,haircut:selected,anatomy:anatomy)
         }
         let mesh = try HairMeshCompiler.compile(input:prepared,haircut:selected,radialSides:3,radiusScale:1)
-        guard try HairArtifactHash.digest(selected) == HairArtifactHash.digest(result.haircut),
-              try HairArtifactHash.digest(validation) == HairArtifactHash.digest(result.validation),
-              try HairArtifactHash.digest(mesh) == HairArtifactHash.digest(result.mesh),
-              try HairArtifactHash.digest(clearance) == HairArtifactHash.digest(result.clearance) else {
-            throw CaptureError.invalid("Conditioning geometry or clearance does not replay locally.")
+        for (name, actual, supplied) in [
+            ("haircut", try HairArtifactHash.digest(selected), try HairArtifactHash.digest(result.haircut)),
+            ("validation", try HairArtifactHash.digest(validation), try HairArtifactHash.digest(result.validation)),
+            ("mesh", try HairArtifactHash.digest(mesh), try HairArtifactHash.digest(result.mesh)),
+            ("clearance", try HairArtifactHash.digest(clearance), try HairArtifactHash.digest(result.clearance))
+        ] {
+            guard actual == supplied else {
+                throw CaptureError.invalid("Conditioning \(name) does not replay locally.")
+            }
         }
         return result
     }

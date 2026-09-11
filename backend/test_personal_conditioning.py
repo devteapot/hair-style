@@ -1,6 +1,7 @@
 """Worker boundary tests; model correctness uses the separate actual Metal run."""
 import hashlib
 import json
+import math
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +10,43 @@ from unittest.mock import patch
 from backend.artifact_store import ArtifactStore
 from backend.compile_worker import run_one
 from backend.job_store import JobStore
+from backend.personal_conditioning import assemble_result
+
+
+class ConditioningAssemblyTests(unittest.TestCase):
+    def test_fitted_identity_and_original_import_are_both_retained(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out=Path(directory);(out/'export').mkdir();(out/'direction-fit').mkdir()
+            def write(name,value):
+                (out/name).write_text(json.dumps(value))
+            original='a'*64;fitted='b'*64
+            write('export/review-report.json',dict(haircutSHA256=original))
+            write('export/imported.json',dict(haircut={'id':'original'},validation=dict(haircutSHA256=original)))
+            write('export/clearance.json',dict(haircutSHA256=original))
+            write('mesh.json',dict(haircutSHA256=original))
+            for name in ('input','source','mapping'):write('export/'+name+'.json',{})
+            record=dict(sourceHaircutSHA256=original)
+            write('direction-fit/record.json',record)
+            write('direction-fit/verification.json',dict(validation=dict(haircutSHA256=fitted),
+                clearance=dict(haircutSHA256=fitted,surfaceChecksPassed=True)))
+            write('direction-fit/haircut.json',{'id':'fitted'})
+            (out/'direction-fit/mesh.json').write_text('{"haircutSHA256":"'+fitted+'","normals":[{"x":-0}]}')
+            report=dict(status='research_review_required',acceptedForPersonalHaircut=False,
+                directionFit=dict(status='verified',haircutSHA256=fitted),selectedHaircutSHA256=fitted,
+                selectedMeshFileSHA256=hashlib.sha256((out/'direction-fit/mesh.json').read_bytes()).hexdigest())
+            write('report.json',report)
+            result=assemble_result(out,{})
+            self.assertEqual(result['haircut']['id'],'fitted')
+            self.assertEqual(result['directionFit'],record)
+            self.assertEqual(math.copysign(1,result['mesh']['normals'][0]['x']),-1)
+            self.assertFalse(result['acceptedForPersonalHaircut'])
+            self.assertFalse(result['personalStyleVerified'])
+            record['sourceHaircutSHA256']=fitted;write('direction-fit/record.json',record)
+            with self.assertRaisesRegex(ValueError,'inconsistent'):assemble_result(out,{})
+            report['directionFit']={'status':'unresolved'};write('report.json',report)
+            result=assemble_result(out,{})
+            self.assertEqual(result['haircut']['id'],'original')
+            self.assertNotIn('directionFit',result)
 
 
 class PersonalConditioningBoundaryTests(unittest.TestCase):

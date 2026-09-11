@@ -12,6 +12,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from fit_conditioned_export import fit_export
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,6 +43,9 @@ def main():
     started = time.monotonic()
     report = dict(method='prepared_personal_conditioning_pipeline_v1',
                   preparationOutputSHA256=args.preparation_output_sha256,
+                  scriptSHA256=digest(Path(__file__)),
+                  directionFitScriptSHA256=digest(ROOT/'tools/fit_conditioned_export.py'),
+                  canonicalJSONScriptSHA256=digest(ROOT/'tools/canonical_json.py'),
                   stages=[], status='running', acceptedForPersonalHaircut=False)
 
     def snapshot(source, name, limit):
@@ -97,13 +101,17 @@ def main():
         if (mesh['haircutSHA256'] != review['haircutSHA256'] or mesh['radiusScale'] != 1
                 or review['acceptedForPersonalHaircut'] is not False):
             raise ValueError('Compiled asset does not match the reviewed research revision')
+        direction_fit = fit_export(out, inspector, invoke)
+        selected_mesh = out/'direction-fit/mesh.json' if direction_fit['status'] == 'verified' else out/'mesh.json'
+        selected = json.loads(selected_mesh.read_bytes())
         report.update(status='research_review_required', review=review,
                       meshFileSHA256=digest(out/'mesh.json'), meshVertexCount=len(mesh['vertices']),
-                      scriptSHA256=digest(Path(__file__)),
                       inputFileSHA256={p.name: digest(p) for p in snapshots.iterdir()},
                       lengthConstraintsEnabled=True,
+                      directionFit=direction_fit, selectedHaircutSHA256=selected['haircutSHA256'],
+                      selectedMeshFileSHA256=digest(selected_mesh),
                       limitations=['Uses an existing model sample; this is personal conditioning, not new brief-driven sampling.',
-                                   'Does not resolve or waive remaining face intersections or missing anatomy.',
+                                   'Unresolved intersections and missing anatomy are retained for review.',
                                    'Style coherence, natural-hair feasibility and physical fit remain unverified.'])
     except Exception as error:
         report.update(status='failed', failure=str(error))

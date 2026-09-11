@@ -64,13 +64,15 @@ clearance. Existing results without a fit retain their original import path.
 rotations on this private regenerated candidate. Two synthetic tests exercise
 replay and tampering rejection, including cumulative movement from the original
 sample. All 169 core tests and the unsigned iOS device build pass. This verifies
-the fit verifier and build compatibility; a fitted result still needs a complete
-worker-to-native integration test.
+the fit verifier and build compatibility. The subsequent complete saved-result
+handoff is documented in the integration report below.
 
-Direction fitting remains a separate post-export experiment in the worker; the
-default conditioning pipeline truthfully retains its pre-fit clearance result.
-The next integration step is to generate the optional record automatically and
-verify the complete result handoff before publishing it. The current successful
-handoff is a local research package. Both ears, inferred scalp
+The worker now runs the bounded post-export search automatically and retains both
+the original export and the fitted artifacts. Clear exports skip it; root
+conflicts or oversized searches remain unsupported; unresolved searches retain
+the original result. A proposed passing fit must replay before compilation and
+selection. Verification failures fail the job rather than publish an unchecked
+fit. See [integrated fitting](integrated-direction-fitting.md) for the complete
+saved-result handoff and transport regression evidence. Both ears, inferred scalp
 accuracy, actual growth locations, physical fit and aesthetic suitability remain
 unverified; acceptance remains false.

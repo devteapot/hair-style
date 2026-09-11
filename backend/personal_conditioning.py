@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 from .job_store import JobStore
 from .worker_process import run_stage
+from tools.canonical_json import loads
 
 
 def condition(store, attempt, work, root, workspace):
@@ -51,7 +52,21 @@ def condition(store, attempt, work, root, workspace):
     if not store.checkpoint(job,token,'compiling',request['preparationSHA256']):
         raise RuntimeError('Personal conditioning is no longer active')
     pipeline=work/'pipeline'
-    def read(name):return json.loads((pipeline/name).read_bytes())
+    output=assemble_result(pipeline,request)
+    data=json.dumps(output,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
+    if len(data)>100_000_000:raise ValueError('Conditioning result exceeds retrieval budget')
+    digest=hashlib.sha256(data).hexdigest();(work/'result.tmp').write_bytes(data);(work/'result.tmp').replace(work/'result.json')
+    for child in work.iterdir():
+        if child.name!='result.json':
+            if child.is_dir():shutil.rmtree(child)
+            else:child.unlink()
+    published=store.finish(job,token,output_hash=digest)
+    return dict(job=job,published=published,outputSHA256=digest if published else None)
+
+
+def assemble_result(pipeline,request):
+    """Assemble retained canonical artifacts; native consumption replays the fit."""
+    def read(name):return loads((pipeline/name).read_bytes())
     report=read('report.json');review=read('export/review-report.json');mesh=read('mesh.json')
     imported=read('export/imported.json');clearance=read('export/clearance.json')
     if (report.get('status')!='research_review_required' or report.get('acceptedForPersonalHaircut') is not False
@@ -65,12 +80,17 @@ def condition(store, attempt, work, root, workspace):
         pipelineReport=report,acceptedForPersonalHaircut=False,personalStyleVerified=False,
         limitations=['Conditions an existing model sample; does not resample a hairstyle from preferences.',
                      'Clearance failures and missing anatomy require review; output is not an accepted personal design.'])
-    data=json.dumps(output,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
-    if len(data)>100_000_000:raise ValueError('Conditioning result exceeds retrieval budget')
-    digest=hashlib.sha256(data).hexdigest();(work/'result.tmp').write_bytes(data);(work/'result.tmp').replace(work/'result.json')
-    for child in work.iterdir():
-        if child.name!='result.json':
-            if child.is_dir():shutil.rmtree(child)
-            else:child.unlink()
-    published=store.finish(job,token,output_hash=digest)
-    return dict(job=job,published=published,outputSHA256=digest if published else None)
+    fit=report.get('directionFit',{})
+    if fit.get('status')=='verified':
+        record=read('direction-fit/record.json');verified=read('direction-fit/verification.json')
+        fitted_mesh=read('direction-fit/mesh.json')
+        if (record.get('sourceHaircutSHA256')!=review['haircutSHA256']
+                or verified['clearance'].get('surfaceChecksPassed') is not True
+                or any(value!=fit.get('haircutSHA256') for value in (
+                    verified['validation']['haircutSHA256'],verified['clearance']['haircutSHA256'],
+                    fitted_mesh['haircutSHA256'],report.get('selectedHaircutSHA256')))
+                or hashlib.sha256((pipeline/'direction-fit/mesh.json').read_bytes()).hexdigest()!=report.get('selectedMeshFileSHA256')):
+            raise ValueError('Fitted conditioning result is inconsistent')
+        output.update(directionFit=record,haircut=read('direction-fit/haircut.json'),
+                      validation=verified['validation'],clearance=verified['clearance'],mesh=fitted_mesh)
+    return output

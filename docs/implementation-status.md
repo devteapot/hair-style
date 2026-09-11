@@ -4,6 +4,8 @@ Updated: 2026-09-11. The full objective remains the implementation plan, M0 thro
 
 ## Implemented and verified
 
+- Added an opt-in local departure-plane decoder objective and four numerical tests. The actual guide-632 run preserves its root and movement bound but violates minimum length; independent replay and canonical validation reject it. The normal conditioning runner and studio candidate are unchanged. See [departure-plane experiment](face-distance-fitting.md#experimental-local-departure-planes).
+
 - Localized all 68 remaining collision records to the first 7.68 mm of their curves and to the largest face-mesh component. Detached surface fragments do not explain the failures. The new diagnostic replays canonical clearance and passes four topology tests; no geometry or collision gate changed. See [collision localization](face-distance-fitting.md#collision-localization-on-the-observed-surface).
 
 - Audited actual decoder root frames with source-root replay, exact clearance replay, and inverse-transpose/cross-product normal agreement. Three numerical tests pass. Conflicting guides do not show unusually large normal mismatch; aligning their normals still leaves conflicts on all six. No candidate is promoted. See [template-frame audit](face-distance-fitting.md#actual-template-frame-audit).

@@ -20,7 +20,9 @@ def main():
     parser.add_argument('--all-guides',action='store_true')
     parser.add_argument('--length-constraints',action='store_true',help='Include exact regional arc-length bounds in the decoder objective.')
     parser.add_argument('--face-distance-penalty',action='store_true',help='Experimental sampled unsigned surface proximity objective; single-guide probes only.')
+    parser.add_argument('--root-departure',action='store_true',help='Add conservative local separating-plane penalties near the fixed root.')
     root_preflight.add_arguments(parser);args=parser.parse_args()
+    if args.root_departure and not args.face_distance_penalty:raise ValueError('Root departure requires the single-guide surface-distance probe')
     if args.face_distance_penalty and args.all_guides:
         raise ValueError('Surface distance probes currently require one guide to bound autograd memory')
     if os.environ.get('PYTORCH_ENABLE_MPS_FALLBACK') not in (None,'0'):raise ValueError('Disable CPU fallback')
@@ -68,6 +70,18 @@ def main():
         if not triangles:raise ValueError('Surface distance requires supplied anatomy')
         surface_triangles=torch.cat(triangles)
         surface_margin=float(anatomy['clearanceMeters'])+args.material_radius_meters+0.001
+    if args.root_departure:
+        from root_departure import departure_planes
+        planes=departure_planes(target[0,0].numpy(),surface_triangles.numpy(),float(anatomy['clearanceMeters'])+args.material_radius_meters)
+        origins=torch.tensor(planes['origins'],dtype=torch.float32);normals=torch.tensor(planes['normals'],dtype=torch.float32)
+        margins=torch.tensor(planes['margins'],dtype=torch.float32)
+        initial_arc=torch.cat([torch.zeros(1),torch.linalg.vector_norm(initial_mapped[0,1:]-initial_mapped[0,:-1],dim=1).cumsum(0)])
+        departure_indices=torch.nonzero(initial_arc<=.012).flatten()
+        def departure_violation(points):
+            near=points[0,departure_indices.to(points.device)]
+            signed=((near[:,None]-origins.to(points.device))*normals.to(points.device)).sum(2)
+            return torch.relu(margins.to(points.device)-signed)
+        initial_departure=departure_violation(initial_mapped)
     def proximity(points):
         samples=torch.cat([points,(points[:,1:]+points[:,:-1])/2],dim=1)
         squared=point_surface_distance_squared(samples.reshape(-1,3),surface_triangles.to(points.device))
@@ -94,6 +108,9 @@ def main():
         if args.face_distance_penalty:
             violations=torch.relu(surface_margin-proximity(mapped))/0.01
             loss=loss+10*(violations.square().mean()+violations.square().max())
+        if args.root_departure:
+            departure=departure_violation(mapped)/.01
+            loss=loss+100*(departure.square().mean()+departure.square().max())
         return loss,distance,mapped,curve
     cpu_latent=latent0.clone().requires_grad_(True);cpu_loss=evaluate(h.dec,cpu_latent)[0];cpu_loss.backward()
     model=copy.deepcopy(h.dec).to('mps');latent=latent0.to('mps').detach().requires_grad_(True)
@@ -143,6 +160,13 @@ def main():
                'Constraint uses an inferred personal envelope, not validated skull or measured growth direction.',
                'The existing 2 mm import correction limit is unchanged; no modified source is passed off as original HAAR output.'])
     report['surfaceDistancePenaltyEnabled']=args.face_distance_penalty
+    report['rootDepartureEnabled']=args.root_departure
+    if args.root_departure:
+        report['rootDepartureProbe']=dict(planeCount=len(origins),sampleCount=len(departure_indices),
+            initialArcWindowMeters=.012,initialMaximumViolationMeters=float(initial_departure.max()),
+            finalMaximumViolationMeters=float(departure_violation(mapped).max()),
+            helperSHA256=sha256(Path(__file__).with_name('root_departure.py')),
+            anatomicalInsideOutsideVerified=False)
     if args.face_distance_penalty:
         with torch.no_grad():final_proximity=proximity(mapped)
         report['surfaceDistanceProbe']=dict(

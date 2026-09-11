@@ -4,6 +4,8 @@ Updated: 2026-09-11. The full objective remains the implementation plan, M0 thro
 
 ## Implemented and verified
 
+- Added continuous fixed-root rotation experiments that preserve curve shape and length. Four new rotation tests and all 13 related numerical tests pass. All 42 real candidates retain roots/length bounds and stay within 14.144 mm of the original decode, but none clears the face. No candidate or default pipeline changes. See [continuous rotation](face-distance-fitting.md#continuous-rotation-with-length-preserved).
+
 - Added an opt-in local departure-plane decoder objective and four numerical tests. The actual guide-632 run preserves its root and movement bound but violates minimum length; independent replay and canonical validation reject it. The normal conditioning runner and studio candidate are unchanged. See [departure-plane experiment](face-distance-fitting.md#experimental-local-departure-planes).
 
 - Localized all 68 remaining collision records to the first 7.68 mm of their curves and to the largest face-mesh component. Detached surface fragments do not explain the failures. The new diagnostic replays canonical clearance and passes four topology tests; no geometry or collision gate changed. See [collision localization](face-distance-fitting.md#collision-localization-on-the-observed-surface).

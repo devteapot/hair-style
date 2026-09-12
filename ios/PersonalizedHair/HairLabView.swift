@@ -267,6 +267,7 @@ struct HairGuideScene: UIViewRepresentable {
     let resetCamera: Int
     var observedFace: CanonicalObservedSurface? = nil
     var preparedMesh: CompiledHairMesh? = nil
+    var timingDelegate: LiveRenderTimingDelegate? = nil
     var conflictingRootIDs: Set<String> = []
     var conflictingSegments: [GuideConflictSegment] = []
     final class Coordinator {
@@ -296,6 +297,9 @@ struct HairGuideScene: UIViewRepresentable {
         return view
     }
     func updateUIView(_ view: SCNView, context: Context) {
+        view.delegate = timingDelegate
+        view.rendersContinuously = timingDelegate != nil
+        if timingDelegate != nil { view.preferredFramesPerSecond = 60 }
         let isModel=record.haircut.generation.origin == .model
         let haircutSignature = preparedMesh?.haircutSHA256 ?? (try? HairArtifactHash.digest(record.haircut)) ?? "invalid"
         let signature = haircutSignature + (preparedMesh.map { ":\($0.method):\($0.radialSides):\($0.radiusScale)" } ?? ":default")
@@ -409,6 +413,10 @@ struct HairGuideScene: UIViewRepresentable {
         }
     }
     private func vector(_ p: Point3D) -> SCNVector3 { SCNVector3(Float(p.x),Float(p.y),Float(p.z)) }
+    static func dismantleUIView(_ view:SCNView,coordinator:Coordinator) {
+        view.delegate=nil
+        view.rendersContinuously=false
+    }
 }
 
 private struct DesignPreferencesView: View {

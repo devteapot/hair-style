@@ -50,3 +50,42 @@ They remain sparse research guides, not a realistic full hairstyle. Screenshots
 are private under `outputs/renderer-comparison-personal-ui/` and
 `outputs/renderer-comparison-synthetic-ui/`. The physical phone was not installed
 or activated, and the default/live representation was not changed.
+
+## Callback timing controls
+
+The comparison now supports 10-second, one-minute and five-minute recording of
+each renderer, plus an explicit early stop. It reuses the bounded SceneKit
+callback recorder with the `renderer_comparison` context. Recording requests
+continuous rendering at 60 Hz and disables renderer switching/reset until the
+run stops. Leaving the view, app inactivity or a viewport-size change ends the
+run and records that reason; it cannot silently combine two representations.
+
+The protected local JSON export retains each recorded renderer's method, geometry
+counts, diagnostic width, requested duration, stop reason, viewport size, device
+model/OS/build, simulator flag, synthetic-haircut flag, displayed face/scalp
+triangle counts, callback samples and thermal counters. It contains no images,
+face coordinates or camera frames. The canonical asset hash remains session-linked
+metadata. Starting a replacement run or closing the screen removes its prepared
+temporary export; a user-shared copy is independent.
+
+The orbit path is user-controlled, not a standardized benchmark. The export
+explicitly leaves GPU completion, presentation and sustained-performance
+verification false. The physical iPhone 15 Pro was disconnected during this work;
+simulator traces cannot establish the plan's device-performance targets.
+
+Three recorder contract tests, the unsigned iOS device build, and synthetic and
+personal-candidate timing/export UI tests pass. The personal test first hit an
+execution-worker startup timeout before exercising the app; its retry passed.
+Independent JSON checks verify two renderer methods, the same canonical hash,
+positive intervals, retained-sample/count arithmetic, p95 calculation, thermal
+totals, correct mesh counts, nonzero viewport dimensions, the simulator/device
+fields and all unverified-performance flags. The exported screen was inspected.
+
+Each personal-candidate ten-second run retained 600 callbacks over approximately
+9.983 seconds between first and last callback. Retained p95 intervals were
+16.902 ms for tubes and 16.932 ms for ribbons; all callback thermal samples were
+nominal. These observations verify the instrumentation, not a performance
+advantage or device target. Reports/checks remain private under
+`outputs/renderer-timing/` and screenshots under `outputs/renderer-timing-ui/`.
+Five-minute physical runs, memory usage, GPU/presentation measurements, and
+standardized camera paths remain outstanding.

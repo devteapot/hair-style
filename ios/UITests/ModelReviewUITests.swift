@@ -1,6 +1,26 @@
 import XCTest
 
 final class ModelReviewUITests:XCTestCase {
+    func testPersonalRendererTimingExportsBothMethods() throws {
+        // Uses the previously imported isolated normal-offset review studio.
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchArguments=["--normal-offset-review-test"];open(app)
+        status("Saved · revision 1",app)
+        let link=app.buttons["compareHairRenderers"];reveal(link,app);link.tap()
+        let scene=app.otherElements["hairRendererComparisonScene"]
+        XCTAssertTrue(scene.waitForExistence(timeout:90))
+        XCTAssertTrue((scene.value as? String ?? "").hasPrefix("guide_tube_mesh_v1|230426|"))
+        let record=app.buttons["recordRendererTiming"];reveal(record,app);record.tap()
+        XCTAssertTrue(app.staticTexts["rendererTimingSummary"].waitForExistence(timeout:20))
+        XCTAssertFalse(app.staticTexts["rendererTimingSummary"].label.hasPrefix("0 callbacks"))
+        let ribbon=app.segmentedControls["hairRendererPicker"].buttons["Ribbons"];reveal(ribbon,app);ribbon.tap()
+        XCTAssertTrue((scene.value as? String ?? "").hasPrefix("guide_ribbon_mesh_v1|152600|"))
+        reveal(record,app);record.tap()
+        XCTAssertTrue(app.staticTexts["rendererTimingSummary"].waitForExistence(timeout:20))
+        let export=app.buttons["exportRendererTiming"];reveal(export,app);export.tap()
+        XCTAssertTrue(app.buttons["shareRendererTiming"].waitForExistence(timeout:10))
+        let shot=XCTAttachment(screenshot:app.screenshot());shot.name="Personal renderer callback export";shot.lifetime = .keepAlways;add(shot)
+    }
     func testPersonalCandidateRendererComparisonPreservesSelection() throws {
         // Requires a private package in Documents/normal-offset-review-test.json.
         continueAfterFailure=false

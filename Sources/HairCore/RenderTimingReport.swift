@@ -3,6 +3,7 @@ import Foundation
 public enum RenderTimingContext: String, Codable, Sendable {
     case liveCamera = "live_camera"
     case syntheticInspection = "synthetic_inspection"
+    case rendererComparison = "renderer_comparison"
 }
 
 public struct RenderTimingSample: Codable, Sendable {

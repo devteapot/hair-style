@@ -1,6 +1,24 @@
 import XCTest
 
 final class HairLabUITests: XCTestCase {
+    func testRendererTimingRecordsBothRepresentationsAndExports() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launch();openLab(app)
+        if app.buttons["createHairFixture"].exists { app.buttons["createHairFixture"].tap() }
+        let link=app.buttons["compareHairRenderers"];reveal(link,in:app);link.tap()
+        let record=app.buttons["recordRendererTiming"]
+        XCTAssertTrue(record.waitForExistence(timeout:30));reveal(record,in:app);record.tap()
+        XCTAssertFalse(app.segmentedControls["hairRendererPicker"].isEnabled)
+        XCTAssertTrue(app.staticTexts["rendererTimingSummary"].waitForExistence(timeout:20))
+        XCTAssertFalse(app.staticTexts["rendererTimingSummary"].label.hasPrefix("0 callbacks"))
+        let ribbon=app.segmentedControls["hairRendererPicker"].buttons["Ribbons"];reveal(ribbon,in:app);ribbon.tap()
+        reveal(record,in:app);record.tap()
+        XCTAssertTrue(app.staticTexts["rendererTimingSummary"].waitForExistence(timeout:20))
+        XCTAssertFalse(app.staticTexts["rendererTimingSummary"].label.hasPrefix("0 callbacks"))
+        let export=app.buttons["exportRendererTiming"];reveal(export,in:app);export.tap()
+        XCTAssertTrue(app.buttons["shareRendererTiming"].waitForExistence(timeout:10))
+        let shot=XCTAttachment(screenshot:app.screenshot());shot.name="Renderer comparison timing export";shot.lifetime = .keepAlways;add(shot)
+    }
     func testRendererComparisonUpdatesGeometryWithoutChangingRevision() throws {
         continueAfterFailure=false
         let app=XCUIApplication();app.launch();openLab(app)
